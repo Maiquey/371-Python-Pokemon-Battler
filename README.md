@@ -37,7 +37,7 @@ Thursdays and Sundays 1pm PST
 - Implemented basic lobby socket connection functionality in terminal mode
 - Implemented basic ready check and simulated game start
 - Created application-layer messaging scheme of splitting headers and payloads with ":"
-Things still to do:
+### Things still to do:
 - create pygame window in client.py to transfer from terminal to gui-style application
 - add guards and safety checks for connection-related issues (disconnects, pre-emptive ready check, etc.)
 - flesh out Player class and implement battle system
