@@ -89,6 +89,7 @@ def start_game():
     broadcast_message("text:2")
     time.sleep(1)
     broadcast_message("text:1")
+    time.sleep(1)
     broadcast_message("game_start")
 
 if __name__ == "__main__":
