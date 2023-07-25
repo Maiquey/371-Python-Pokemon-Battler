@@ -65,37 +65,57 @@ def show_gameplay_screen():
     window.blit(text_surface, text_rect)
     pygame.display.flip()
 
+# Recive the player count from server
+def receive_dictionary_length(client_socket):
+    try:
+        data = client_socket.recv(1024).decode("utf-8")
+        if data.startswith("dictionary_length:"):
+            length = int(data.split(":")[1])
+            return length
+        else:
+            print("Invalid message received.")
+    except Exception as e:
+        print(f"Error receiving dictionary length: {e}")
+    return None
+
 if __name__ == "__main__":
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect(('localhost', 8080))
 
-    # Thread for incoming messages
-    receiver_thread = threading.Thread(target=receive_message, args=(client_socket,))
-    receiver_thread.start()
+    # Check if there's already 2 players. If yes, close the connection. If no, continues 
+    player_count = receive_dictionary_length(client_socket)
+    if player_count >= 2:
+        print(f"Sorry, the lobby is full")
+        client_socket.close
+    
+    else:
+        # Thread for incoming messages
+        receiver_thread = threading.Thread(target=receive_message, args=(client_socket,))
+        receiver_thread.start()
 
-    # Pygame main loop
-    running = True
-    locked_in = False
+        # Pygame main loop
+        running = True
+        locked_in = False
 
-    window.fill(WHITE)
-    draw_button()
-    pygame.display.flip()
+        window.fill(WHITE)
+        draw_button()
+        pygame.display.flip()
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_pos = pygame.mouse.get_pos()
-                if not locked_in:
-                    button_rect = pygame.Rect(300, 270, 200, 60)
-                    if button_rect.collidepoint(mouse_pos):
-                        # lock the button and send ready message to server
-                        locked_in = True
-                        draw_button_lock()
-                        ready_message = "ready"
-                        client_socket.send(ready_message.encode("utf-8"))
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if not locked_in:
+                        button_rect = pygame.Rect(300, 270, 200, 60)
+                        if button_rect.collidepoint(mouse_pos):
+                            # lock the button and send ready message to server
+                            locked_in = True
+                            draw_button_lock()
+                            ready_message = "ready"
+                            client_socket.send(ready_message.encode("utf-8"))
 
-    # Close the client socket and quit Pygame when the loop ends
-    client_socket.close()
-    pygame.quit()
+        # Close the client socket and quit Pygame when the loop ends
+        client_socket.close()
+        pygame.quit()
