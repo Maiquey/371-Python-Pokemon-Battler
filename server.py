@@ -11,27 +11,34 @@ clients = {}
 def server_main():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(('localhost', 8080))
-    server_socket.listen(2)
+    server_socket.listen(2) # Set the backlog to 2 to allow two clients to connect.
 
     print("server listening on port 8080")
 
     # allow 2 clients to connect
-    while len(clients) < 2:
+    while True:
         try:
             client_socket, client_address = server_socket.accept()
-            print(f"Accepted connection from {client_address}")
+            send_dictionary_length(client_socket, len(clients)) # Send the player count the the client
 
-            # set a client ID
-            client_id = len(clients) + 1
 
-            # create player entry in clients
-            clients[client_id] = Player(client_socket)
+            if len(clients) < 2: # only two players are allowed to play
+                print(f"Accepted connection from {client_address}")
 
-            # serve client on seperate thread
-            client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, client_id))
-            client_thread.start()
+                # set a client ID
+                client_id = len(clients) + 1
+
+                # create player entry in clients
+                clients[client_id] = Player(client_socket)
+
+                # serve client on seperate thread
+                client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, client_id))
+                client_thread.start()
         except Exception as e:
             print(f"Error accepting client connection: {e}")    
+    
+    # close server socket
+    server_socket.close()
     
 # client thread
 def communicate_with_client(client_socket, client_id):
@@ -80,6 +87,14 @@ def ready_check():
         if not player.is_ready():
             return
     start_game()
+
+# send the dictionary length to the client so it knows whether to draws a new pygame window or not
+def send_dictionary_length(client_socket, length):
+    try:
+        message = f"dictionary_length:{length}"
+        client_socket.send(message.encode("utf-8"))
+    except Exception as e:
+        print(f"Error sending dictionary length to client: {e}")   
 
 # TODO
 # currently just simulates how a game may start
