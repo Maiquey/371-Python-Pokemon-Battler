@@ -5,7 +5,7 @@ from models.player import Player
 
 # dictionary of connected clients
 # {client_id, Player}
-clients = []
+clients = {}
 
 # main server thread
 def server_main():
@@ -27,7 +27,7 @@ def server_main():
 
                 # create player entry in clients
                 p = Player(client_socket)
-                clients.append(p)
+                clients[p.clientId] = p
 
                 # serve client on seperate thread
                 client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, p.clientId))

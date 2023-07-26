@@ -4,7 +4,7 @@ class Player:
     count = 0
     def __init__(self, sock):
         Player.count += 1
-        self.clientId = Player.id
+        self.clientId = Player.count
         self.ready = False
         self.sock = sock
         self.pokemons = []
@@ -13,6 +13,20 @@ class Player:
     def capturePokemon(self, pokemon):
         self.pokemons.append(pokemon)
 
+    def get_hp(self):
+        return self.hp
+
+    def get_energy(self):
+        return self.energy
+
+    def is_alive(self):
+        return self.alive
+
+    def is_ready(self):
+        return self.ready
+
+    def get_socket(self):
+        return self.sock
 
 
 pokemonSeedData = [
