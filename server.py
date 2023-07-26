@@ -1,11 +1,11 @@
 import socket
 import threading
 import time
-from player import Player
+from models.player import Player
 
 # dictionary of connected clients
 # {client_id, Player}
-clients = {}
+clients = []
 
 # main server thread
 def server_main():
@@ -25,14 +25,12 @@ def server_main():
             if len(clients) < 2: # only two players are allowed to play
                 print(f"Accepted connection from {client_address}")
 
-                # set a client ID
-                client_id = len(clients) + 1
-
                 # create player entry in clients
-                clients[client_id] = Player(client_socket)
+                p = Player(client_socket)
+                clients.append(p)
 
                 # serve client on seperate thread
-                client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, client_id))
+                client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, p.clientId))
                 client_thread.start()
         except Exception as e:
             print(f"Error accepting client connection: {e}")    
