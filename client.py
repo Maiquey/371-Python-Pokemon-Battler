@@ -256,9 +256,11 @@ if __name__ == "__main__":
 
                     # For Clicking Abiltiies in Battle
                     else:
-                        # Grab ability dmgs
+                        # Grab ability dmgs and names
                         ability1_dmg = battle_pokemon.ability[list(battle_pokemon.ability)[0]]
+                        ability1_name = list(battle_pokemon.ability)[0]
                         ability2_dmg = battle_pokemon.ability[list(battle_pokemon.ability)[1]]
+                        ability2_name = list(battle_pokemon.ability)[1]
 
                         # Locations of where the abilities are on the screen
                         ability1_rect = pygame.Rect(50, 520, 180, 60) 
@@ -270,14 +272,16 @@ if __name__ == "__main__":
                             current_energy -= ability1_dmg
 
                             # Send Attack message
-                            dmg_message = f"attack:{ability1_dmg}"
+                            dmg_message = f"attack:{ability1_name}:damage:{ability1_dmg}"
+                            print(dmg_message)
                             client_socket.send(dmg_message.encode("utf-8"))
                         elif (ability2_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[1]] == False):
                             # Update Current Energy Value
                             current_energy -= ability2_dmg
 
                             # Send Attack message
-                            dmg_message = f"attack:{ability2_dmg}"
+                            dmg_message = f"attack:{ability2_name}:damage:{ability2_dmg}"
+                            print(dmg_message)
                             client_socket.send(dmg_message.encode("utf-8"))
 
                         # Greys out ability buttons if now the updated energy is less than cost
