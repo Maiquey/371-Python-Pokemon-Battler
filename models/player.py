@@ -8,26 +8,17 @@ class Player:
         self.ready = False
         self.sock = sock
         self.pokemons = []
+        # Justin: Not sure if we need this? Since how would they capture it?
+        # Originally thought they have access to all the pokemon
+        # Unless you want to restrict how many pokemon they can choose from?
         self.capturePokemon(pokemonSeedData[0])
+        # Currently set to first pokemon in their list
+        # TODO (If needed)
+        # If we want them to choose their own pokemon then we have to change it
+        self.battlePokemon = self.pokemons[0]
     
     def capturePokemon(self, pokemon):
         self.pokemons.append(pokemon)
-
-    def get_hp(self):
-        return self.hp
-
-    def get_energy(self):
-        return self.energy
-
-    def is_alive(self):
-        return self.alive
-
-    def is_ready(self):
-        return self.ready
-
-    def get_socket(self):
-        return self.sock
-
 
 pokemonSeedData = [
     Pokemon("Pikachu", {"Thunderbolt": 20, "Quick Attack": 15}),

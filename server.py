@@ -1,10 +1,12 @@
 import socket
 import threading
 import time
+import pickle
 from models.player import Player
 
 # dictionary of connected clients
 # {client_id, Player}
+# Justin's Change: Changed Shotaro's conversion from list back to dictionary
 clients = {}
 
 # main server thread
@@ -15,6 +17,9 @@ def server_main():
 
     print("server listening on port 8080")
 
+    # TODO
+    # Still need to make sure there are 2 players are connected before starting
+    # If theres only 1 player and they click "ready", game still starts
     # allow 2 clients to connect
     while True:
         try:
@@ -26,6 +31,7 @@ def server_main():
                 print(f"Accepted connection from {client_address}")
 
                 # create player entry in clients
+                # Justin's Change: Changed Shotaro's conversion from list back to dictionary 
                 p = Player(client_socket)
                 clients[p.clientId] = p
 
@@ -75,14 +81,20 @@ def communicate_with_client(client_socket, client_id):
 def broadcast_message(message):
     for client in clients.values():
         try:
-            client.get_socket().send(message.encode("utf-8"))
+            # Justin: Since we dont need to use getters/setters, replaced function called with class variable call
+            if message == "game_start":
+                # First send a message regarding the pokemon info         
+                pokemonMsg = f"pokemon:{pickle.dumps(client.battlePokemon)}"
+                client.sock.send(pokemonMsg.encode("utf-8"))
+            client.sock.send(message.encode("utf-8"))
         except:
             print("Error broadcasting message.")
 
 # check if all players are ready before starting game
 def ready_check():
     for player in clients.values():
-        if not player.is_ready():
+        # Justin: Since we dont need to use getters/setters, replaced function called with class variable call
+        if not player.ready:
             return
     start_game()
 
