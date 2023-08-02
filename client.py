@@ -40,6 +40,7 @@ def receive_message(sock):
                 print(next(msg_iterator))
             elif header == "log":
                 print(f"Log: {next(msg_iterator)}")
+                # TODO: show these messages in the attack log instead of printing to console
             # game_start header for starting the game
             elif header == "pokemon":
                 global battle_pokemon 

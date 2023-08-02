@@ -13,7 +13,7 @@ clients_locked = False
 clients = {}
 
 # hard coded list of all implemented actions
-actions = {} #TODO: add actions
+actions = {}
 
 # main server thread
 def server_main():
@@ -67,7 +67,6 @@ def communicate_with_client(client_socket, client_id):
             header = next(msg_iterator)
 
             # server request logic
-            # TODO: add other options for headers for combat such as "attack"
             if header == "ready":
                 msg = f"text:Player {client_id} is ready"
                 broadcast_message(msg)
