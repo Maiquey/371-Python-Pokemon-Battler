@@ -41,3 +41,10 @@ Thursdays and Sundays 1pm PST
 - create pygame window in client.py to transfer from terminal to gui-style application
 - add guards and safety checks for connection-related issues (disconnects, pre-emptive ready check, etc.)
 - flesh out Player class and implement battle system
+
+## Wednesday, Aug 2, 2023 Changelog
+- Implemented game over screens and return to lobby logic
+- Implemented backend logic for attacks and hp updates, including lock of attacking object
+- Implemented logic for main gameplay loop
+- Implemented energy_counter pausing for client during attack
+- Fixed frontend render using threads

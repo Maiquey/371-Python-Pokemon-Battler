@@ -12,7 +12,7 @@ energy_locked = False
 game_over = False
 player_hp = 100
 enemy_hp = 100
-
+global_threads = []
 
 # incoming messages
 def receive_message(sock):
@@ -46,12 +46,9 @@ def receive_message(sock):
                 battle_pokemon = pickle.loads(eval(next(msg_iterator)))
             elif header == "game_start":
                 print("loading game")
-                # TODO 
-                # pass in information such as pokemon, own and opponent's hp vals, etc.
-
-                # change pygame window to battle screen
                 show_gameplay_screen()
-            # TODO implement energy locking
+            # energy locking while attack occurring
+            # TODO: disable inputs while energy_locked OR implement energy refund message from server
             elif header == "pause_counter":
                 energy_locked = True
             elif header == "resume_counter":
@@ -59,6 +56,7 @@ def receive_message(sock):
             elif header == "hp_update":
                 player_hp = int(next(msg_iterator))
                 enemy_hp = int(next(msg_iterator))
+                show_gameplay_screen()
             elif header == "game_over":
                 print("game_over received")
                 win_state = next(msg_iterator)
@@ -157,14 +155,9 @@ def energy_counter():
     global game_over
     global energy_locked
 
-    # Energy Counter
+    # Energy Counter box location
     box_size = 150
     energy_box = pygame.Rect(270, (WINDOW_SIZE[1] - box_size - 20), box_size, box_size)
-    pygame.draw.rect(window, BLACK, energy_box, 3 , 3)
-    text_surface = underline_font.render("Energy", True, ORANGE)
-    box_center = energy_box.center
-    text_rect = text_surface.get_rect(center=(box_center[0], box_center[1]-30))
-    window.blit(text_surface, text_rect)
 
     # Incrementing Energy Counter
     while True:
@@ -256,8 +249,21 @@ def show_gameplay_screen():
     text_surface = attack_log_font.render("Attack Log", True, BLACK)
     window.blit(text_surface, ((WINDOW_SIZE[0] - 340 + 5), (WINDOW_SIZE[1] - 170 + 5)))
 
+    # Energy Counter
+    box_size = 150
+    energy_box = pygame.Rect(270, (WINDOW_SIZE[1] - box_size - 20), box_size, box_size)
+    pygame.draw.rect(window, BLACK, energy_box, 3 , 3)
+    text_surface = underline_font.render("Energy", True, ORANGE)
+    box_center = energy_box.center
+    text_rect = text_surface.get_rect(center=(box_center[0], box_center[1]-30))
+    window.blit(text_surface, text_rect)
+
     # Energy Counter + Timer 
-    energy_counter()
+    global global_threads
+    if len(global_threads) == 0:
+        counter_thread = threading.Thread(target=energy_counter)
+        global_threads.append(counter_thread)
+        global_threads[0].start()
 
 
 # Recive the player count from server
@@ -326,6 +332,11 @@ if __name__ == "__main__":
                             client_socket.send(return_message.encode("utf-8"))
                             game_over = False
                             ready_locked_in = False
+                            global_threads[0].join()
+                            global_threads.clear()
+                            current_energy = 0
+                            player_hp = 100
+                            enemy_hp = 100
                             draw_lobby_screen()
                     # For Clicking Abiltiies in Battle
                     else:

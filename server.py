@@ -79,6 +79,8 @@ def communicate_with_client(client_socket, client_id):
                     damage = next(msg_iterator)
                     print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
                     process_attack(client_id, attack_name, damage)
+            elif header == "return":
+                clients[client_id].battlePokemon.current_hp = clients[client_id].battlePokemon.hp 
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
@@ -118,8 +120,6 @@ def send_dictionary_length(client_socket, length):
     except Exception as e:
         print(f"Error sending dictionary length to client: {e}")   
 
-# TODO
-# currently just simulates how a game may start
 def start_game():
     broadcast_message("text:All players are ready\nStarting Game\n3")
     time.sleep(1)
@@ -132,11 +132,6 @@ def start_game():
 def process_attack(client_id, attack_name, damage):
     global clients_locked
 
-    # print("hi")
-    # print(type(client_id))
-    # print(type(attack_name))
-    # print(type(damage))
-
     opponent_id = 0
 
     # Should only ever be 2 clients at a time
@@ -144,52 +139,42 @@ def process_attack(client_id, attack_name, damage):
         if key != client_id:
             opponent_id = key
 
-    # print("hoyo")
-
     attacker = clients[client_id]
     opponent = clients[opponent_id]
 
-    # print("hello")
-    # request = client_socket.recv(1024).decode("utf-8")
 
     if clients_locked:
         attacker.sock.send("text:Waiting for other player to finish their turn".encode("utf-8"))
         return
 
-    # print("got here!")
     with lock:
         clients_locked = True
         broadcast_message("pause_counter")
-        # client_socket.send("text:Executing attack".encode("utf-8"))
 
-        print(opponent.battlePokemon.current_hp)
         opponent.battlePokemon.get_attacked(int(damage))
-        print(opponent.battlePokemon.current_hp)
 
-        # target.health -= attack.damage
         broadcast_message(f"log:player {client_id} used {attack_name}, dealing {damage} damage!")
 
-        #send results
-        # client_socket.send(f"attack:{attack.name}:{attack.message}:{target.health}".encode("utf-8"))
-        # oponent.get_socket().send(f"attack:{attack.name}:{attack.message}:{target.health}".encode("utf-8"))
+        # calculate new hp vals
         attacker_hp = attacker.battlePokemon.current_hp
         opponent_hp = opponent.battlePokemon.current_hp
-        print(f"{attacker.clientId}: {attacker_hp}")
-        print(f"{opponent.clientId}: {opponent_hp}")
 
+        time.sleep(1)
         try:
-            attacker.sock.send(f"update_hp:{attacker_hp}:{opponent_hp}".encode("utf-8"))
-            opponent.sock.send(f"update_hp:{opponent_hp}:{attacker_hp}".encode("utf-8"))
+            # Send hp updates to clients
+            attacker.sock.send(f"hp_update:{attacker_hp}:{opponent_hp}".encode("utf-8"))
+            opponent.sock.send(f"hp_update:{opponent_hp}:{attacker_hp}".encode("utf-8"))
         except Exception as error:
             print(error)
-        time.sleep(2)
+        time.sleep(1)
         
         #check if game is over
         if opponent.battlePokemon.current_hp <= 0:
             print("game over!")
-            # broadcast_message("game_over")
-            # clients[client_id].get_socket().send("text:You win!".encode("utf-8"))
-            # clients[oponent].get_socket().send("text:You lose!".encode("utf-8"))
+            # Reset each player's ready state for future games
+            attacker.ready = False
+            opponent.ready = False
+            # Send gameover messages
             attacker.sock.send("game_over:win".encode("utf-8"))
             opponent.sock.send("game_over:lose".encode("utf-8"))
         else:
