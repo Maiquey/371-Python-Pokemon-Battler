@@ -10,11 +10,20 @@ ability_lock = {}
 current_energy = 0
 energy_locked = False
 game_over = False
+player_hp = 100
+enemy_hp = 100
+
 
 # incoming messages
 def receive_message(sock):
+    message_lock = threading.Lock()
     while True:
         try:
+        # with message_lock:
+            global energy_locked
+            global player_hp
+            global enemy_hp
+
             data = sock.recv(4096)
             if not data:
                 break
@@ -29,6 +38,8 @@ def receive_message(sock):
             # text header for printing text
             if header == "text":
                 print(next(msg_iterator))
+            elif header == "log":
+                print(f"Log: {next(msg_iterator)}")
             # game_start header for starting the game
             elif header == "pokemon":
                 global battle_pokemon 
@@ -40,12 +51,16 @@ def receive_message(sock):
 
                 # change pygame window to battle screen
                 show_gameplay_screen()
-            #TODO implement energy locking
-            # elif header == "pause_counter":
-            #     energy_locked = True
-            # elif header == "resume_counter":
-            #     energy_locked = False
+            # TODO implement energy locking
+            elif header == "pause_counter":
+                energy_locked = True
+            elif header == "resume_counter":
+                energy_locked = False
+            elif header == "hp_update":
+                player_hp = int(next(msg_iterator))
+                enemy_hp = int(next(msg_iterator))
             elif header == "game_over":
+                print("game_over received")
                 win_state = next(msg_iterator)
                 render_game_over_screen(win_state)             
 
@@ -197,6 +212,8 @@ def render_game_over_screen(win_state):
     game_over = True
 
 def show_gameplay_screen():
+    global player_hp
+    global enemy_hp
     # Background
     window.fill(TAN)
     
@@ -218,8 +235,8 @@ def show_gameplay_screen():
     pygame.draw.line(window, BLACK, (100, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
     text_surface = underline_font.render("Player 1", True, BLACK)
     window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 140)))
-    p_health = 100
-    text_surface = font.render("Health: " + str(p_health), True, BLACK)
+    # p_health = 100
+    text_surface = font.render("Health: " + str(player_hp), True, BLACK)
     window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
     pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 100), 100), 6)
@@ -227,8 +244,8 @@ def show_gameplay_screen():
     text_rect = text_surface.get_rect()
     text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 100)
     window.blit(text_surface,text_rect)
-    p_health = 100
-    text_surface = font.render("Health: " + str(p_health), True, BLACK)
+    # p_health = 100
+    text_surface = font.render("Health: " + str(enemy_hp), True, BLACK)
     text_rect = text_surface.get_rect()
     text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 100)
     window.blit(text_surface, text_rect)
