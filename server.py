@@ -67,6 +67,11 @@ def communicate_with_client(client_socket, client_id):
                 broadcast_message(msg)
                 clients[client_id].ready = True
                 ready_check()
+            elif header == "attack":
+                attack_name = next(msg_iterator)
+                if next(msg_iterator) == "damage":
+                    damage = next(msg_iterator)
+                    print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
