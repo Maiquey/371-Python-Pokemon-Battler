@@ -4,10 +4,16 @@ import time
 import pickle
 from models.player import Player
 
+lock = threading.Lock()
+clients_locked = False
+
 # dictionary of connected clients
 # {client_id, Player}
 # Justin's Change: Changed Shotaro's conversion from list back to dictionary
 clients = {}
+
+# hard coded list of all implemented actions
+actions = {} #TODO: add actions
 
 # main server thread
 def server_main():
@@ -124,3 +130,34 @@ def start_game():
 
 if __name__ == "__main__":
     server_main()
+
+def process_attack(client_socket, client_id, attack):
+    global clients_locked
+
+    oponent = clients[(client_id + 1) % 2]
+
+    request = client_socket.recv(1024).decode("utf-8")
+
+    with lock:
+        if clients_locked:
+            client_socket.send("text:Waiting for other player to finish their turn".encode("utf-8"))
+            return
+    
+        clients_locked = True
+        client_socket.send("text:Executing attack".encode("utf-8"))
+
+        target = clients[oponent]
+        target.health -= attack.damage
+
+        #send results
+        client_socket.send(f"attack:{attack.name}:{attack.message}:{target.health}".encode("utf-8"))
+        oponent.get_socket().send(f"attack:{attack.name}:{attack.message}:{target.health}".encode("utf-8"))
+        
+        #check if game is over
+        if target.health <= 0:
+            broadcast_message("game_over")
+            clients[client_id].get_socket().send("text:You win!".encode("utf-8"))
+            clients[oponent].get_socket().send("text:You lose!".encode("utf-8"))
+
+        clients_locked = False
+        return
