@@ -24,13 +24,15 @@ def server_main():
     print("server listening on port 8080")
 
     # TODO
-    # Still need to make sure there are 2 players are connected before starting
-    # If theres only 1 player and they click "ready", game still starts
+    # Still need to make sure there are 2 players are connected before starting - done
+    # If theres only 1 player and they click "ready", game still starts - done
+
     # allow 2 clients to connect
     while True:
         try:
             client_socket, client_address = server_socket.accept()
-            send_dictionary_length(client_socket, len(clients)) # Send the player count the the client
+            # Send the player count the the client for checking
+            send_dictionary_length(client_socket, len(clients)) 
 
             if len(clients) < 2: # only two players are allowed to play
                 print(f"Accepted connection from {client_address}")
@@ -111,13 +113,16 @@ def broadcast_message(message):
 
 # check if all players are ready before starting game
 def ready_check():
+    # check if all players are ready
     for player in clients.values():
         # Justin: Since we dont need to use getters/setters, replaced function called with class variable call
         if not player.ready:
             return
-    start_game()
+    # check if there are only 2 players 
+    if len(clients) == 2:
+        start_game()
 
-# send the dictionary length to the client so it knows whether to draws a new pygame window or not
+# send the dictionary length/player count to the client so it knows whether to draws a new pygame window or not
 def send_dictionary_length(client_socket, length):
     try:
         message = f"dictionary_length:{length}"
