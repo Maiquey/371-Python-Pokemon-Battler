@@ -32,7 +32,6 @@ def server_main():
             client_socket, client_address = server_socket.accept()
             send_dictionary_length(client_socket, len(clients)) # Send the player count the the client
 
-
             if len(clients) < 2: # only two players are allowed to play
                 print(f"Accepted connection from {client_address}")
 
@@ -58,7 +57,7 @@ def communicate_with_client(client_socket, client_id):
             if not data:
                 break
             message = data.decode("utf-8")
-
+                
             #split headers and payloads with :
             applicationMessage = message.split(":")
 
@@ -70,6 +69,8 @@ def communicate_with_client(client_socket, client_id):
             if header == "ready":
                 msg = f"text:Player {client_id} is ready"
                 broadcast_message(msg)
+                pokemon_index = applicationMessage[1]
+                clients[client_id].usePokemon(int(pokemon_index))
                 clients[client_id].ready = True
                 ready_check()
             elif header == "attack":

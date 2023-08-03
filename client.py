@@ -1,18 +1,22 @@
 import socket
 import threading
+import requests
 import pygame
+import random
 import pickle
 from models.pokemon import Pokemon
+from io import BytesIO
 
 # Global Varaibles
-battle_pokemon = Pokemon("", {})
+battle_pokemon = Pokemon("", {}, 0)
 ability_lock = {}
 current_energy = 0
 energy_locked = False
 game_over = False
-player_hp = 100
 enemy_hp = 100
 global_threads = []
+ball_state = random_numbers = random.sample(range(10), 3)
+selected_ball = 0
 
 # incoming messages
 def receive_message(sock):
@@ -95,6 +99,28 @@ def draw_button():
     text_surface = font.render("Ready", True, WHITE)
     text_rect = text_surface.get_rect(center=button_rect.center)
     window.blit(text_surface, text_rect)
+
+def draw_balls():
+    scale_factor = 0.1
+    img = pygame.image.load("./img/ball.png")
+    img_width = int(img.get_width() * scale_factor)
+    img_height = int(img.get_height() * scale_factor)
+    img = pygame.transform.scale(img, (img_width, img_height))
+    ball_button1 = pygame.Rect(250, 400, 60, 60)
+    ball_button2 = pygame.Rect(365, 400, 60, 60)
+    ball_button3 = pygame.Rect(480, 400, 60, 60)
+    pygame.draw.circle(window, GREEN if selected_ball == 0 else WHITE, ball_button1.center, 30)
+    pygame.draw.circle(window, GREEN if selected_ball == 1 else WHITE, ball_button2.center, 30)
+    pygame.draw.circle(window, GREEN if selected_ball == 2 else WHITE, ball_button3.center, 30)
+    ball_rect1 = img.get_rect(center=ball_button1.center)
+    ball_rect2 = img.get_rect(center=ball_button2.center)
+    ball_rect3 = img.get_rect(center=ball_button3.center)
+    window.blit(img, ball_rect1)
+    window.blit(img, ball_rect2)
+    window.blit(img, ball_rect3)
+
+    return selected_ball
+
 
 def draw_button_lock():
     button_rect = pygame.Rect(300, 270, 200, 60)
@@ -206,7 +232,6 @@ def render_game_over_screen(win_state):
     game_over = True
 
 def show_gameplay_screen():
-    global player_hp
     global enemy_hp
     # Background
     window.fill(TAN)
@@ -221,17 +246,29 @@ def show_gameplay_screen():
     pygame.draw.rect(window, BLACK, hud_border)
 
     # Ability Buttons
-    draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0])
-    draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1])
+    for key, value in battle_pokemon.ability.items():
+        draw_ability_button_lock(value, key)
+    #pokemon img
+    url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.number); 
+    response = requests.get(url)
+    img_data = response.json()["sprites"]["back_default"]
+    img_response = requests.get(img_data)
+    img = pygame.image.load(BytesIO(img_response.content))
+    scale_factor = 3.0
+    img_width = int(img.get_width() * scale_factor)
+    img_height = int(img.get_height() * scale_factor)
+    img = pygame.transform.scale(img, (img_width, img_height))
+    icon_rect = pygame.Rect(-20, 170, 60, 60)
+    window.blit(img, icon_rect)
 
     # Health Bars
     # Player's Health
-    pygame.draw.line(window, BLACK, (100, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
+    pygame.draw.line(window, BLACK, (200, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
     text_surface = underline_font.render("Player 1", True, BLACK)
-    window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 140)))
+    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 140)))
     # p_health = 100
-    text_surface = font.render("Health: " + str(player_hp), True, BLACK)
-    window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 110)))
+    text_surface = font.render("Health: " + str(battle_pokemon.hp), True, BLACK)
+    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
     pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 100), 100), 6)
     text_surface = underline_font.render("Player 2", True, BLACK)
@@ -283,6 +320,7 @@ def receive_dictionary_length(client_socket):
 def draw_lobby_screen():
     window.fill(WHITE)
     draw_button()
+    draw_balls()
     pygame.display.flip()
 
 if __name__ == "__main__":
@@ -316,13 +354,37 @@ if __name__ == "__main__":
                     # For Ready Button
                     if not ready_locked_in:
                         button_rect = pygame.Rect(300, 270, 200, 60)
+                        ball_button1 = pygame.Rect(250, 400, 60, 60)
+                        ball_button2 = pygame.Rect(365, 400, 60, 60)
+                        ball_button3 = pygame.Rect(480, 400, 60, 60)
 
+                        # select pokemon for battle
+                        if ball_button1.collidepoint(mouse_pos):
+                            selected_ball = 0
+                            window.fill(WHITE)
+                            draw_button()
+                            draw_balls()
+                            pygame.display.flip()
+                       
+                        if ball_button2.collidepoint(mouse_pos):
+                            selected_ball = 1
+                            window.fill(WHITE)
+                            draw_button()
+                            draw_balls()
+                            pygame.display.flip()
+                        if ball_button3.collidepoint(mouse_pos):
+                            selected_ball = 2
+                            window.fill(WHITE)
+                            draw_button()
+                            draw_balls()
+                            pygame.display.flip()
                         if button_rect.collidepoint(mouse_pos):
                             # lock the button and send ready message to server
                             ready_locked_in = True
                             draw_button_lock()
-                            ready_message = "ready"
+                            ready_message = f"ready:{ball_state[selected_ball]}"
                             client_socket.send(ready_message.encode("utf-8"))
+                        
 
                     elif game_over:
                         button_rect = pygame.Rect(300, 270, 200, 60)
