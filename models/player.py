@@ -24,6 +24,7 @@ pokemonSeedData = [
     Pokemon("Geodude", {"Rock Throw": 16, "Magnitude": 23}, 74),
     Pokemon("Abra", {"Teleport": 10, "Psybeam": 20}, 63),
     Pokemon("Eevee", {"Quick Attack": 15, "Bite": 16 }, 133),
+    Pokemon("Mewtwo", {"Psychic": 35, "Shadow Ball": 25}, 150),
 ]
 
         

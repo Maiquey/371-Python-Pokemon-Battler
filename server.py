@@ -93,16 +93,21 @@ def communicate_with_client(client_socket, client_id):
 
 # send message to all connected clients
 def broadcast_message(message):
-    for client in clients.values():
-        try:
-            # Justin: Since we dont need to use getters/setters, replaced function called with class variable call
-            if message == "game_start":
-                # First send a message regarding the pokemon info         
-                pokemonMsg = f"pokemon:{pickle.dumps(client.battlePokemon)}"
-                client.sock.send(pokemonMsg.encode("utf-8"))
-            client.sock.send(message.encode("utf-8"))
-        except:
-            print("Error broadcasting message.")
+    try:
+        keys = list(clients.keys())
+        if message == "game_start":
+            # if player1 and player2 use same pokemon, player1 get Mewtwo as a special pokemon
+            if clients[keys[0]].battlePokemon == clients[keys[1]].battlePokemon:
+                clients[keys[0]].usePokemon(clients[keys[0]].pokemons[-1])
+            pokemonMsg = pokemonMsg = f"pokemon:{pickle.dumps(clients[keys[0]].battlePokemon)}:{pickle.dumps(clients[keys[1]].battlePokemon)}"
+            clients[keys[0]].sock.send(pokemonMsg.encode("utf-8"))
+            pokemonMsg = pokemonMsg = f"pokemon:{pickle.dumps(clients[keys[1]].battlePokemon)}:{pickle.dumps(clients[keys[0]].battlePokemon)}"
+            clients[keys[1]].sock.send(pokemonMsg.encode("utf-8"))
+        clients[keys[0]].sock.send(message.encode("utf-8"))
+        clients[keys[1]].sock.send(message.encode("utf-8"))
+    except:
+        print("Error broadcasting message.")
+
 
 # check if all players are ready before starting game
 def ready_check():
