@@ -4,10 +4,16 @@ import time
 import pickle
 from models.player import Player
 
+lock = threading.Lock()
+clients_locked = False
+
 # dictionary of connected clients
 # {client_id, Player}
 # Justin's Change: Changed Shotaro's conversion from list back to dictionary
 clients = {}
+
+# hard coded list of all implemented actions
+actions = {}
 
 # main server thread
 def server_main():
@@ -61,12 +67,19 @@ def communicate_with_client(client_socket, client_id):
             header = next(msg_iterator)
 
             # server request logic
-            # TODO: add other options for headers for combat such as "attack"
             if header == "ready":
                 msg = f"text:Player {client_id} is ready"
                 broadcast_message(msg)
                 clients[client_id].ready = True
                 ready_check()
+            elif header == "attack":
+                attack_name = next(msg_iterator)
+                if next(msg_iterator) == "damage":
+                    damage = next(msg_iterator)
+                    print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
+                    process_attack(client_id, attack_name, damage)
+            elif header == "return":
+                clients[client_id].battlePokemon.current_hp = clients[client_id].battlePokemon.hp 
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
@@ -106,8 +119,6 @@ def send_dictionary_length(client_socket, length):
     except Exception as e:
         print(f"Error sending dictionary length to client: {e}")   
 
-# TODO
-# currently just simulates how a game may start
 def start_game():
     broadcast_message("text:All players are ready\nStarting Game\n3")
     time.sleep(1)
@@ -117,5 +128,60 @@ def start_game():
     time.sleep(1)
     broadcast_message("game_start")
 
+def process_attack(client_id, attack_name, damage):
+    global clients_locked
+
+    opponent_id = 0
+
+    # Should only ever be 2 clients at a time
+    for key, value in clients.items():
+        if key != client_id:
+            opponent_id = key
+
+    attacker = clients[client_id]
+    opponent = clients[opponent_id]
+
+
+    if clients_locked:
+        attacker.sock.send("text:Waiting for other player to finish their turn".encode("utf-8"))
+        return
+
+    with lock:
+        clients_locked = True
+        broadcast_message("pause_counter")
+
+        opponent.battlePokemon.get_attacked(int(damage))
+
+        broadcast_message(f"log:player {client_id} used {attack_name}, dealing {damage} damage!")
+
+        # calculate new hp vals
+        attacker_hp = attacker.battlePokemon.current_hp
+        opponent_hp = opponent.battlePokemon.current_hp
+
+        time.sleep(1)
+        try:
+            # Send hp updates to clients
+            attacker.sock.send(f"hp_update:{attacker_hp}:{opponent_hp}".encode("utf-8"))
+            opponent.sock.send(f"hp_update:{opponent_hp}:{attacker_hp}".encode("utf-8"))
+        except Exception as error:
+            print(error)
+        time.sleep(1)
+        
+        #check if game is over
+        if opponent.battlePokemon.current_hp <= 0:
+            print("game over!")
+            # Reset each player's ready state for future games
+            attacker.ready = False
+            opponent.ready = False
+            # Send gameover messages
+            attacker.sock.send("game_over:win".encode("utf-8"))
+            opponent.sock.send("game_over:lose".encode("utf-8"))
+        else:
+            broadcast_message("resume_counter")
+
+        clients_locked = False
+        return
+
 if __name__ == "__main__":
     server_main()
+

@@ -8,11 +8,22 @@ from models.pokemon import Pokemon
 battle_pokemon = Pokemon("", {})
 ability_lock = {}
 current_energy = 0
+energy_locked = False
+game_over = False
+player_hp = 100
+enemy_hp = 100
+global_threads = []
 
 # incoming messages
 def receive_message(sock):
+    message_lock = threading.Lock()
     while True:
         try:
+        # with message_lock:
+            global energy_locked
+            global player_hp
+            global enemy_hp
+
             data = sock.recv(4096)
             if not data:
                 break
@@ -27,17 +38,31 @@ def receive_message(sock):
             # text header for printing text
             if header == "text":
                 print(next(msg_iterator))
+            elif header == "log":
+                print(f"Log: {next(msg_iterator)}")
+                # TODO: show these messages in the attack log instead of printing to console
             # game_start header for starting the game
             elif header == "pokemon":
                 global battle_pokemon 
                 battle_pokemon = pickle.loads(eval(next(msg_iterator)))
             elif header == "game_start":
                 print("loading game")
-                # TODO 
-                # pass in information such as pokemon, own and opponent's hp vals, etc.
-
-                # change pygame window to battle screen
                 show_gameplay_screen()
+            # energy locking while attack occurring
+            # TODO: disable inputs while energy_locked OR implement energy refund message from server
+            elif header == "pause_counter":
+                energy_locked = True
+            elif header == "resume_counter":
+                energy_locked = False
+            elif header == "hp_update":
+                player_hp = int(next(msg_iterator))
+                enemy_hp = int(next(msg_iterator))
+                show_gameplay_screen()
+            elif header == "game_over":
+                print("game_over received")
+                win_state = next(msg_iterator)
+                render_game_over_screen(win_state)             
+
         except Exception as error:
             print(error)
             break
@@ -78,6 +103,13 @@ def draw_button_lock():
     text_rect = text_surface.get_rect(center=button_rect.center)
     window.blit(text_surface, text_rect)
     pygame.display.flip()
+
+def draw_return_button():
+    button_rect = pygame.Rect(300, 270, 200, 60)
+    pygame.draw.rect(window, WHITE, button_rect)
+    text_surface = font.render("Return to Lobby", True, BLACK)
+    text_rect = text_surface.get_rect(center=button_rect.center)
+    window.blit(text_surface, text_rect)
 
 # Function to draw ability buttons for battle view
 def draw_ability_button(padding, name, colour):
@@ -121,18 +153,17 @@ def energy_counter():
     screen = pygame.display.get_surface()
 
     global current_energy
+    global game_over
+    global energy_locked
 
-    # Energy Counter
+    # Energy Counter box location
     box_size = 150
     energy_box = pygame.Rect(270, (WINDOW_SIZE[1] - box_size - 20), box_size, box_size)
-    pygame.draw.rect(window, BLACK, energy_box, 3 , 3)
-    text_surface = underline_font.render("Energy", True, ORANGE)
-    box_center = energy_box.center
-    text_rect = text_surface.get_rect(center=(box_center[0], box_center[1]-30))
-    window.blit(text_surface, text_rect)
 
     # Incrementing Energy Counter
     while True:
+        if game_over:
+            break
         # Create Value
         text_surface = font.render(str(current_energy), True, ORANGE)
         box_center = energy_box.center
@@ -143,7 +174,14 @@ def energy_counter():
         screen.fill(WHITE, white_rect)
         window.blit(text_surface, text_rect)
         pygame.display.flip()
-        current_energy += 1
+
+        # # For Testing Only (Ensuring game over logic works before server messaging implemented)
+        # if current_energy == 20:
+        #     render_game_over_screen("win")
+        
+        # Cap energy at 200
+        if not energy_locked and current_energy < 200:
+            current_energy += 1
         clock.tick(5)
 
         # Change Ability Button Colours from Greyed
@@ -152,8 +190,24 @@ def energy_counter():
         if current_energy >= ability_dmg[1]:
             draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
         
+def render_game_over_screen(win_state):
+    global game_over
+    window.fill(BLUE)
+    font = pygame.font.Font(None, 72)
+    if win_state == "win":
+        gameover_text = "Game Won!"
+    else:
+        gameover_text = "Game Lost!"
+    text_surface = font.render(gameover_text, True, BLACK)
+    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 3))
+    window.blit(text_surface, text_rect)
+    draw_return_button()
+    pygame.display.flip()
+    game_over = True
 
 def show_gameplay_screen():
+    global player_hp
+    global enemy_hp
     # Background
     window.fill(TAN)
     
@@ -175,8 +229,8 @@ def show_gameplay_screen():
     pygame.draw.line(window, BLACK, (100, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
     text_surface = underline_font.render("Player 1", True, BLACK)
     window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 140)))
-    p_health = 100
-    text_surface = font.render("Health: " + str(p_health), True, BLACK)
+    # p_health = 100
+    text_surface = font.render("Health: " + str(player_hp), True, BLACK)
     window.blit(text_surface, (100, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
     pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 100), 100), 6)
@@ -184,8 +238,8 @@ def show_gameplay_screen():
     text_rect = text_surface.get_rect()
     text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 100)
     window.blit(text_surface,text_rect)
-    p_health = 100
-    text_surface = font.render("Health: " + str(p_health), True, BLACK)
+    # p_health = 100
+    text_surface = font.render("Health: " + str(enemy_hp), True, BLACK)
     text_rect = text_surface.get_rect()
     text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 100)
     window.blit(text_surface, text_rect)
@@ -196,8 +250,21 @@ def show_gameplay_screen():
     text_surface = attack_log_font.render("Attack Log", True, BLACK)
     window.blit(text_surface, ((WINDOW_SIZE[0] - 340 + 5), (WINDOW_SIZE[1] - 170 + 5)))
 
+    # Energy Counter
+    box_size = 150
+    energy_box = pygame.Rect(270, (WINDOW_SIZE[1] - box_size - 20), box_size, box_size)
+    pygame.draw.rect(window, BLACK, energy_box, 3 , 3)
+    text_surface = underline_font.render("Energy", True, ORANGE)
+    box_center = energy_box.center
+    text_rect = text_surface.get_rect(center=(box_center[0], box_center[1]-30))
+    window.blit(text_surface, text_rect)
+
     # Energy Counter + Timer 
-    energy_counter()
+    global global_threads
+    if len(global_threads) == 0:
+        counter_thread = threading.Thread(target=energy_counter)
+        global_threads.append(counter_thread)
+        global_threads[0].start()
 
 
 # Recive the player count from server
@@ -212,6 +279,11 @@ def receive_dictionary_length(client_socket):
     except Exception as e:
         print(f"Error receiving dictionary length: {e}")
     return None
+
+def draw_lobby_screen():
+    window.fill(WHITE)
+    draw_button()
+    pygame.display.flip()
 
 if __name__ == "__main__":
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -233,9 +305,7 @@ if __name__ == "__main__":
         ready_locked_in = False
         ability_locked_in = False
 
-        window.fill(WHITE)
-        draw_button()
-        pygame.display.flip()
+        draw_lobby_screen()
 
         while running:
             for event in pygame.event.get():
@@ -254,6 +324,21 @@ if __name__ == "__main__":
                             ready_message = "ready"
                             client_socket.send(ready_message.encode("utf-8"))
 
+                    elif game_over:
+                        button_rect = pygame.Rect(300, 270, 200, 60)
+
+                        if button_rect.collidepoint(mouse_pos):
+                            # lock the button and send ready message to server
+                            return_message = "return"
+                            client_socket.send(return_message.encode("utf-8"))
+                            game_over = False
+                            ready_locked_in = False
+                            global_threads[0].join()
+                            global_threads.clear()
+                            current_energy = 0
+                            player_hp = 100
+                            enemy_hp = 100
+                            draw_lobby_screen()
                     # For Clicking Abiltiies in Battle
                     else:
                         # Grab ability dmgs and names

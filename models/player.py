@@ -1,4 +1,5 @@
 from models.pokemon import Pokemon
+import copy
 
 class Player:
     count = 0
@@ -11,14 +12,15 @@ class Player:
         # Justin: Not sure if we need this? Since how would they capture it?
         # Originally thought they have access to all the pokemon
         # Unless you want to restrict how many pokemon they can choose from?
-        self.capturePokemon(pokemonSeedData[0])
+        self.capturePokemon(pokemonSeedData[Player.count % len(pokemonSeedData)])
         # Currently set to first pokemon in their list
         # TODO (If needed)
         # If we want them to choose their own pokemon then we have to change it
         self.battlePokemon = self.pokemons[0]
     
     def capturePokemon(self, pokemon):
-        self.pokemons.append(pokemon)
+        # deep_copy_pokemon = copy.deepcopy(pokemonSeedData[0])
+        self.pokemons.append(copy.deepcopy(pokemon))
 
 pokemonSeedData = [
     Pokemon("Pikachu", {"Thunderbolt": 20, "Quick Attack": 15}),
