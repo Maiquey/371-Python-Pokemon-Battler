@@ -246,6 +246,14 @@ def render_game_over_screen(win_state):
     game_over = True
 
 def render_log(log_history):
+    #Clear the logs, there is probably a better way to do this
+    white_rect = pygame.Rect((WINDOW_SIZE[0] - 340), (WINDOW_SIZE[1] - 170), 300, 150)
+    energy_box = pygame.Rect((WINDOW_SIZE[0] - 340), (WINDOW_SIZE[1] - 170), (WINDOW_SIZE[0] - (WINDOW_SIZE[0] - 270) + 20), 150)
+    pygame.draw.rect(window, WHITE, white_rect, 0 , 3)
+    pygame.draw.rect(window, BLACK, energy_box, 3 , 3)
+    text_surface = attack_log_font.render("Attack Log", True, BLACK)
+    window.blit(text_surface, ((WINDOW_SIZE[0] - 340 + 5), (WINDOW_SIZE[1] - 170 + 5)))
+
     #Render the updated logs
     font = pygame.font.Font(None, 18)
     for index, msg in enumerate(log_history):
