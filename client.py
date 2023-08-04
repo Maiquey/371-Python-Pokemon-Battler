@@ -15,14 +15,14 @@ ability_lock = {}
 current_energy = 0
 my_pokemon_image = None
 enemy_pokemon_image = None
-energy_locked = False
+attack_lock = False #if there is an attack in progress
 game_over = False
 player_hp = 100
 enemy_hp = 100
 global_threads = []
 ball_state = random_numbers = random.sample(range(10), 3)
 selected_ball = 0
-attack_log_history = deque(maxlen=5) # max length of 5, will pop off oldest log when new more than 5 logs have been added
+attack_log_history = deque()
 
 # incoming messages
 def receive_message(sock):
@@ -30,7 +30,7 @@ def receive_message(sock):
     while True:
         try:
         # with message_lock:
-            global energy_locked
+            global attack_lock
             global player_hp
             global enemy_hp
 
@@ -51,7 +51,9 @@ def receive_message(sock):
             elif header == "log":
                 log_message = next(msg_iterator)
                 attack_log_history.append(log_message)
-                print(f"Log: {log_message}")
+                if len(attack_log_history) > 5:
+                    attack_log_history.popleft()
+                print(f"Log: {log_message}") #REMOVE
                 render_log(attack_log_history)
             # game_start header for starting the game
             elif header == "pokemon":
@@ -62,13 +64,13 @@ def receive_message(sock):
             elif header == "game_start":
                 print("loading game")
                 show_gameplay_screen()
-            # energy locking while attack occurring
-            # TODO: disable inputs while energy_locked OR implement energy refund message from server
-            elif header == "pause_counter":
-                energy_locked = True
+            elif header == "lock":
+                attack_lock = True
                 render_attack()
-            elif header == "resume_counter":
-                energy_locked = False
+                #TODO: grey out buttons
+            elif header == "unlock":
+                attack_lock = False
+                #TODO: un-grey buttons
             elif header == "hp_update":
                 player_hp = int(next(msg_iterator))
                 enemy_hp = int(next(msg_iterator))
@@ -192,7 +194,7 @@ def energy_counter():
 
     global current_energy
     global game_over
-    global energy_locked
+    global attack_lock
 
     # Energy Counter box location
     box_size = 150
@@ -218,7 +220,7 @@ def energy_counter():
         #     render_game_over_screen("win")
         
         # Cap energy at 200
-        if not energy_locked and current_energy < 200:
+        if not attack_lock and current_energy < 200:
             current_energy += 1
         clock.tick(5)
 
@@ -244,6 +246,7 @@ def render_game_over_screen(win_state):
     game_over = True
 
 def render_log(log_history):
+    #Render the updated logs
     font = pygame.font.Font(None, 18)
     for index, msg in enumerate(log_history):
         text_surface = font.render(msg, True, BLACK)
@@ -252,12 +255,13 @@ def render_log(log_history):
         window.blit(text_surface, (text_x, text_y))
     pygame.display.flip()
 
-# Function to flash the attack incoming message. 
+# Function to flash the attack message. 
 def render_attack():
+    message = "Attack!"
     font = pygame.font.Font(None, 100)
     flashing = True
     flash_count = 0
-    text_surface = font.render("Attack Incoming!", True, RED)
+    text_surface = font.render(message, True, RED)
     text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 3))
     while flash_count < 6: # Flashes on 3 times, Flashes off 3 times
         if flashing:
@@ -471,7 +475,7 @@ if __name__ == "__main__":
                         ability2_rect = pygame.Rect(50, 430, 180, 60)
 
                         # Checks if ability is not greyed out, and if they clicked on the button
-                        if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False):
+                        if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False) and (not attack_lock):
                             # Update Current Energy Value
                             current_energy -= ability1_dmg
 
@@ -479,7 +483,7 @@ if __name__ == "__main__":
                             dmg_message = f"attack:{ability1_name}:damage:{ability1_dmg}"
                             print(dmg_message)
                             client_socket.send(dmg_message.encode("utf-8"))
-                        elif (ability2_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[1]] == False):
+                        elif (ability2_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[1]] == False) and (not attack_lock):
                             # Update Current Energy Value
                             current_energy -= ability2_dmg
 
@@ -488,11 +492,12 @@ if __name__ == "__main__":
                             print(dmg_message)
                             client_socket.send(dmg_message.encode("utf-8"))
 
-                        # Greys out ability buttons if now the updated energy is less than cost
-                        if current_energy < ability1_dmg:
+                        # Greys out ability buttons if now the updated energy is less than cost or if there is an attack going on
+                        if current_energy < ability1_dmg or attack_lock:
                             draw_ability_button_lock(20, list(battle_pokemon.ability)[0])
-                        if current_energy < ability2_dmg:
+                        if current_energy < ability1_dmg or attack_lock:
                             draw_ability_button_lock(110, list(battle_pokemon.ability)[1])
+
 
         # Close the client socket and quit Pygame when the loop ends
         client_socket.close()
