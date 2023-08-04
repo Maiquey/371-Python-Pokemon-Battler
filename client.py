@@ -4,6 +4,7 @@ import requests
 import pygame
 import random
 import pickle
+from collections import deque
 from models.pokemon import Pokemon
 from io import BytesIO
 
@@ -21,6 +22,7 @@ enemy_hp = 100
 global_threads = []
 ball_state = random_numbers = random.sample(range(10), 3)
 selected_ball = 0
+attack_log_history = deque(maxlen=5) # max length of 5, will pop off oldest log when new more than 5 logs have been added
 
 # incoming messages
 def receive_message(sock):
@@ -47,8 +49,10 @@ def receive_message(sock):
             if header == "text":
                 print(next(msg_iterator))
             elif header == "log":
-                print(f"Log: {next(msg_iterator)}")
-                # TODO: show these messages in the attack log instead of printing to console
+                log_message = next(msg_iterator)
+                attack_log_history.append(log_message)
+                print(f"Log: {log_message}")
+                render_log(attack_log_history)
             # game_start header for starting the game
             elif header == "pokemon":
                 global battle_pokemon 
@@ -62,6 +66,7 @@ def receive_message(sock):
             # TODO: disable inputs while energy_locked OR implement energy refund message from server
             elif header == "pause_counter":
                 energy_locked = True
+                render_attack()
             elif header == "resume_counter":
                 energy_locked = False
             elif header == "hp_update":
@@ -84,6 +89,7 @@ WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 GREEN_LOCKED = (153, 255, 153)
 BLUE = (0, 0, 255)
+RED = (255, 0, 0)
 BLACK = (0, 0, 0)
 TAN = (253, 222, 129)
 MAGENTA = (186, 104, 200)
@@ -236,6 +242,35 @@ def render_game_over_screen(win_state):
     draw_return_button()
     pygame.display.flip()
     game_over = True
+
+def render_log(log_history):
+    font = pygame.font.Font(None, 18)
+    for index, msg in enumerate(log_history):
+        text_surface = font.render(msg, True, BLACK)
+        text_x = WINDOW_SIZE[0] - 340 + 5  # X-coordinate inside the rect
+        text_y = WINDOW_SIZE[1] - 170 + 30 + index * 25  # Y-coordinate inside the rect, 25 pixels down per line
+        window.blit(text_surface, (text_x, text_y))
+    pygame.display.flip()
+
+# Function to flash the attack incoming message. 
+def render_attack():
+    font = pygame.font.Font(None, 100)
+    flashing = True
+    flash_count = 0
+    text_surface = font.render("Attack Incoming!", True, RED)
+    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 3))
+    while flash_count < 6: # Flashes on 3 times, Flashes off 3 times
+        if flashing:
+            window.blit(text_surface, text_rect)
+            pygame.display.flip()
+            pygame.time.wait(333)
+            flashing = False
+        else:
+            window.fill(TAN, text_rect) # Fills the text rect with the background colour
+            pygame.display.flip()
+            pygame.time.wait(333)
+            flashing = True
+        flash_count += 1
 
 def show_gameplay_screen():
     global enemy_hp
