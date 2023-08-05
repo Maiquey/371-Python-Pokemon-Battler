@@ -81,6 +81,11 @@ def communicate_with_client(client_socket, client_id):
                     damage = next(msg_iterator)
                     print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
                     process_attack(client_id, attack_name, damage)
+            elif header == "boost":
+                 # Should only ever be 2 clients at a time
+                 for key in clients.keys():
+                    if key != client_id:
+                       clients[key].sock.send("boost".encode("utf-8"))
             elif header == "return":
                 clients[client_id].battlePokemon.current_hp = clients[client_id].battlePokemon.hp 
 

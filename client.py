@@ -8,8 +8,8 @@ from models.pokemon import Pokemon
 from io import BytesIO
 
 # Global Varaibles
-battle_pokemon = Pokemon("", {}, 0)
-enemy_pokemon = Pokemon("", {}, 0)
+battle_pokemon = Pokemon("", {}, 0, 0)
+enemy_pokemon = Pokemon("", {}, 0, 0)
 ability_lock = {}
 current_energy = 0
 my_pokemon_image = None
@@ -21,6 +21,8 @@ enemy_hp = 100
 global_threads = []
 ball_state = random_numbers = random.sample(range(10), 3)
 selected_ball = 0
+boosted = False
+enemy_boosted = False
 
 # incoming messages
 def receive_message(sock):
@@ -31,6 +33,8 @@ def receive_message(sock):
             global energy_locked
             global player_hp
             global enemy_hp
+            global enemy_boosted
+            global enemy_pokemon_image
 
             data = sock.recv(4096)
             if not data:
@@ -64,6 +68,10 @@ def receive_message(sock):
                 energy_locked = True
             elif header == "resume_counter":
                 energy_locked = False
+            elif header == "boost":
+                enemy_boosted = True
+                enemy_pokemon_image = None
+                show_gameplay_screen()
             elif header == "hp_update":
                 player_hp = int(next(msg_iterator))
                 enemy_hp = int(next(msg_iterator))
@@ -187,6 +195,10 @@ def energy_counter():
     global current_energy
     global game_over
     global energy_locked
+    global enemy_boosted
+    global boosted
+    global my_pokemon_image
+    global enemy_pokemon_image
 
     # Energy Counter box location
     box_size = 150
@@ -196,6 +208,10 @@ def energy_counter():
     while True:
         if game_over:
             energy_locked = False
+            my_pokemon_image = None
+            enemy_pokemon_image = None
+            boosted = False
+            enemy_boosted = False
             break
         # Create Value
         text_surface = font.render(str(current_energy), True, ORANGE)
@@ -214,7 +230,8 @@ def energy_counter():
         
         # Cap energy at 200
         if not energy_locked and current_energy < 200:
-            current_energy += 1
+            current_energy +=1
+            if boosted:current_energy += 1
         clock.tick(5)
 
         # Change Ability Button Colours from Greyed
@@ -242,6 +259,8 @@ def show_gameplay_screen():
     global enemy_hp
     global my_pokemon_image
     global enemy_pokemon_image
+    global enemy_boosted
+    global boosted
     # Background
     window.fill(TAN)
     
@@ -259,12 +278,12 @@ def show_gameplay_screen():
     draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1])
     # fetch pokemon img
     if(my_pokemon_image == None):
-        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.number); 
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.boosted_number if boosted else battle_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["back_default"]
         my_pokemon_image = requests.get(img_data)
     img = pygame.image.load(BytesIO(my_pokemon_image.content))
-    scale_factor = 3.0
+    scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
     img = pygame.transform.scale(img, (img_width, img_height))
@@ -272,36 +291,45 @@ def show_gameplay_screen():
     window.blit(img, my_pokemon_image_rect)
     
     if(enemy_pokemon_image == None):
-        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.number); 
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.boosted_number if enemy_boosted else enemy_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["front_default"]
         enemy_pokemon_image= requests.get(img_data)
     img = pygame.image.load(BytesIO(enemy_pokemon_image.content))
-    scale_factor = 3.0
+    scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
     img = pygame.transform.scale(img, (img_width, img_height))
     enemy_pokemon_image_rect = pygame.Rect(550, -50, 60, 60)
     window.blit(img, enemy_pokemon_image_rect)
 
+    #boosted button
+    scale_factor = 0.1
+    img = pygame.image.load("./img/fire.png" if boosted else "./img/fire2.png")
+    img_width = int(img.get_width() * scale_factor)
+    img_height = int(img.get_height() * scale_factor)
+    img = pygame.transform.scale(img, (img_width, img_height))
+    boosted_button = pygame.Rect(720, 310, 60, 60)
+    window.blit(img, boosted_button)
+
     # Health Bars
     # Player's Health
-    pygame.draw.line(window, BLACK, (200, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
+    pygame.draw.line(window, BLACK, (230, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
     text_surface = underline_font.render("Player 1", True, BLACK)
-    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 140)))
+    window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 140)))
     # p_health = 100
     text_surface = font.render("Health: " + str(player_hp), True, BLACK)
-    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 110)))
+    window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
-    pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 170), 100), 6)
+    pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 200), 100), 6)
     text_surface = underline_font.render("Player 2", True, BLACK)
     text_rect = text_surface.get_rect()
-    text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 170)
+    text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 200)
     window.blit(text_surface,text_rect)
     # p_health = 100
     text_surface = font.render("Health: " + str(enemy_hp), True, BLACK)
     text_rect = text_surface.get_rect()
-    text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 170)
+    text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 200)
     window.blit(text_surface, text_rect)
 
     # Attack History Window
@@ -425,6 +453,9 @@ if __name__ == "__main__":
                             draw_lobby_screen()
                     # For Clicking Abiltiies in Battle
                     else:
+                        # Boost Pokemon
+                        boosted_button = pygame.Rect(720, 310, 60, 60)
+
                         # Grab ability dmgs and names
                         while battle_pokemon.ability == {}:
                             continue
@@ -437,6 +468,16 @@ if __name__ == "__main__":
                         ability1_rect = pygame.Rect(50, 520, 180, 60) 
                         ability2_rect = pygame.Rect(50, 430, 180, 60)
 
+                        # boost pokemon
+                        if boosted_button.collidepoint(mouse_pos):
+                            if current_energy > 15:
+                                boosted = True
+                                my_pokemon_image = None
+                                boost_message ="boost"
+                                print("boosting !!!")
+                                client_socket.send(boost_message.encode("utf-8"))
+                                show_gameplay_screen()
+                            
                         # Checks if ability is not greyed out, and if they clicked on the button
                         if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False):
                             # Update Current Energy Value
