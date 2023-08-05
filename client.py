@@ -197,6 +197,7 @@ def energy_counter():
     global game_over
     global attack_lock
     global attack_render_queue
+    global attack_log_history
 
     # Energy Counter box location
     box_size = 150
@@ -205,7 +206,8 @@ def energy_counter():
     # Incrementing Energy Counter
     while True:
         if game_over:
-            energy_locked = False
+            attack_lock = False
+            attack_log_history.clear()
             break
         # Create Value
         text_surface = font.render(str(current_energy), True, ORANGE)
