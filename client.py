@@ -234,10 +234,6 @@ def energy_counter():
             draw_ability_button(20, list(battle_pokemon.ability.keys())[0], MAGENTA)
         if current_energy >= ability_dmg[1]:
             draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
-
-        if attack_render_queue > 0:
-            render_attack()
-            attack_render_queue -= 1
         
 def render_game_over_screen(win_state):
     global game_over
@@ -274,24 +270,31 @@ def render_log(log_history):
 
 # Function to flash the attack message. 
 def render_attack():
-    message = "Attack!"
-    font = pygame.font.Font(None, 100)
-    flashing = True
-    flash_count = 0
-    text_surface = font.render(message, True, RED)
-    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 3))
-    while flash_count < 6: # Flashes on 3 times, Flashes off 3 times
-        if flashing:
-            window.blit(text_surface, text_rect)
-            pygame.display.flip()
-            pygame.time.wait(333)
-            flashing = False
-        else:
-            window.fill(TAN, text_rect) # Fills the text rect with the background colour
-            pygame.display.flip()
-            pygame.time.wait(333)
+    global game_over
+    global attack_render_queue
+    while True:
+        if game_over:
+            break
+        if attack_render_queue > 0:
+            message = "Attack!"
+            font = pygame.font.Font(None, 100)
             flashing = True
-        flash_count += 1
+            flash_count = 0
+            text_surface = font.render(message, True, RED)
+            text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 3))
+            while flash_count < 6: # Flashes on 3 times, Flashes off 3 times
+                if flashing:
+                    window.blit(text_surface, text_rect)
+                    pygame.display.flip()
+                    pygame.time.wait(333)
+                    flashing = False
+                else:
+                    window.fill(TAN, text_rect) # Fills the text rect with the background colour
+                    pygame.display.flip()
+                    pygame.time.wait(333)
+                    flashing = True
+                flash_count += 1
+            attack_render_queue -= 1
 
 def show_gameplay_screen():
     global enemy_hp
@@ -379,8 +382,11 @@ def show_gameplay_screen():
     # Energy Counter + Timer 
     if len(global_threads) == 0:
         counter_thread = threading.Thread(target=energy_counter)
+        attack_render_thread = threading.Thread(target=render_attack)
         global_threads.append(counter_thread)
+        global_threads.append(attack_render_thread)
         global_threads[0].start()
+        global_threads[1].start()
 
 
 # Recive the player count from server
@@ -474,8 +480,9 @@ if __name__ == "__main__":
                             client_socket.send(return_message.encode("utf-8"))
                             game_over = False
                             ready_locked_in = False
-                            global_threads[0].join()
-                            global_threads.pop()
+                            while len(global_threads) > 0:
+                                global_threads[-1].join()
+                                global_threads.pop()
                             current_energy = 0
                             player_hp = 100
                             enemy_hp = 100
