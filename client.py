@@ -195,6 +195,7 @@ def energy_counter():
     # Incrementing Energy Counter
     while True:
         if game_over:
+            energy_locked = False
             break
         # Create Value
         text_surface = font.render(str(current_energy), True, ORANGE)
@@ -319,7 +320,6 @@ def show_gameplay_screen():
     window.blit(text_surface, text_rect)
 
     # Energy Counter + Timer 
-    global global_threads
     if len(global_threads) == 0:
         counter_thread = threading.Thread(target=energy_counter)
         global_threads.append(counter_thread)
@@ -418,7 +418,7 @@ if __name__ == "__main__":
                             game_over = False
                             ready_locked_in = False
                             global_threads[0].join()
-                            global_threads.clear()
+                            global_threads.pop()
                             current_energy = 0
                             player_hp = 100
                             enemy_hp = 100
@@ -426,6 +426,8 @@ if __name__ == "__main__":
                     # For Clicking Abiltiies in Battle
                     else:
                         # Grab ability dmgs and names
+                        while battle_pokemon.ability == {}:
+                            continue
                         ability1_dmg = battle_pokemon.ability[list(battle_pokemon.ability)[0]]
                         ability1_name = list(battle_pokemon.ability)[0]
                         ability2_dmg = battle_pokemon.ability[list(battle_pokemon.ability)[1]]
