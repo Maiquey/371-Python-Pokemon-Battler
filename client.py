@@ -23,6 +23,7 @@ global_threads = []
 ball_state = random_numbers = random.sample(range(10), 3)
 selected_ball = 0
 attack_log_history = deque()
+attack_render_queue = 0
 
 # incoming messages
 def receive_message(sock):
@@ -33,6 +34,7 @@ def receive_message(sock):
             global attack_lock
             global player_hp
             global enemy_hp
+            global attack_render_queue
 
             data = sock.recv(4096)
             if not data:
@@ -54,7 +56,6 @@ def receive_message(sock):
                 if len(attack_log_history) > 5:
                     attack_log_history.popleft()
                 print(f"Log: {log_message}") #REMOVE
-                render_log(attack_log_history)
             # game_start header for starting the game
             elif header == "pokemon":
                 global battle_pokemon 
@@ -66,7 +67,7 @@ def receive_message(sock):
                 show_gameplay_screen()
             elif header == "lock":
                 attack_lock = True
-                render_attack()
+                attack_render_queue += 1
                 #TODO: grey out buttons
             elif header == "unlock":
                 attack_lock = False
@@ -195,6 +196,7 @@ def energy_counter():
     global current_energy
     global game_over
     global attack_lock
+    global attack_render_queue
 
     # Energy Counter box location
     box_size = 150
@@ -229,6 +231,10 @@ def energy_counter():
             draw_ability_button(20, list(battle_pokemon.ability.keys())[0], MAGENTA)
         if current_energy >= ability_dmg[1]:
             draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
+
+        if attack_render_queue > 0:
+            render_attack()
+            attack_render_queue -= 1
         
 def render_game_over_screen(win_state):
     global game_over
@@ -317,6 +323,8 @@ def show_gameplay_screen():
     my_pokemon_image_rect = pygame.Rect(-20, 170, 60, 60)
     window.blit(img, my_pokemon_image_rect)
     
+    render_log(attack_log_history)
+
     if(enemy_pokemon_image == None):
         url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.number); 
         response = requests.get(url)

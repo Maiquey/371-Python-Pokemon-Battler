@@ -167,7 +167,7 @@ def process_attack(client_id, attack_name, damage):
         attacker_hp = attacker.battlePokemon.current_hp
         opponent_hp = opponent.battlePokemon.current_hp
 
-        time.sleep(2)
+        time.sleep(1)
         try:
             # Send hp updates to clients
             attacker.sock.send(f"hp_update:{attacker_hp}:{opponent_hp}".encode("utf-8"))
