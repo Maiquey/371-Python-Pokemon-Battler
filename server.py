@@ -154,14 +154,12 @@ def process_attack(client_id, attack_name, damage):
     attacker = clients[client_id]
     opponent = clients[opponent_id]
 
-
-    if clients_locked:
-        attacker.sock.send("text:Waiting for other player to finish their turn".encode("utf-8"))
-        return
-
     with lock:
+        if clients_locked:
+            attacker.sock.send("text:Waiting for other player to finish their turn".encode("utf-8"))
+            return
         clients_locked = True
-        broadcast_message("pause_counter")
+        broadcast_message("lock")
 
         opponent.battlePokemon.get_attacked(int(damage))
 
@@ -190,7 +188,7 @@ def process_attack(client_id, attack_name, damage):
             attacker.sock.send("game_over:win".encode("utf-8"))
             opponent.sock.send("game_over:lose".encode("utf-8"))
         else:
-            broadcast_message("resume_counter")
+            broadcast_message("unlock")
 
         clients_locked = False
         return
