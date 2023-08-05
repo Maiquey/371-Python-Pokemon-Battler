@@ -79,7 +79,23 @@ def receive_message(sock):
             elif header == "game_over":
                 print("game_over received")
                 win_state = next(msg_iterator)
-                render_game_over_screen(win_state)             
+                render_game_over_screen(win_state) 
+            # the client id and even/odd check are used to display two different ready status line
+            elif header == "ready_display":
+                player_id = next(msg_iterator)
+                ready_status = next(msg_iterator)
+                print(ready_status)
+                if int(player_id) % 2 == 0:
+                    display_ready_status_top(ready_status)
+                else:
+                    display_ready_status_bottom(ready_status)
+            # for displaying countdown timer until game start
+            elif header == "count_down":
+                countdown = next(msg_iterator)
+                print(countdown)
+                count_down(countdown)
+
+
 
         except Exception as error:
             print(error)
@@ -107,6 +123,38 @@ underline_font = pygame.font.Font(None, 36)
 underline_font.set_underline(True)
 attack_log_font = pygame.font.Font(None, 28)
 attack_log_font.set_underline(True)
+
+
+def count_down(countdown):
+    # Clear the previous text by filling with the background color
+    clear = pygame.Rect((0, WINDOW_SIZE[1] - 600), (WINDOW_SIZE[0], 100))
+    window.fill(WHITE, clear)
+
+    # Render and display the new countdown value
+    font = pygame.font.Font(None, 70)
+    text_surface = font.render(countdown, True, BLACK)
+    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2))
+    text_rect.bottom = WINDOW_SIZE[1] - 500
+    window.blit(text_surface, text_rect)
+    pygame.display.flip()
+
+# display the first player's ready status
+def display_ready_status_top(ready_status):
+    font = pygame.font.Font(None, 36)
+    text_surface = font.render(ready_status, True, BLACK)
+    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2))
+    text_rect.bottom = WINDOW_SIZE[1] - 25
+    window.blit(text_surface, text_rect)
+    pygame.display.flip()
+
+# display the second player's ready status
+def display_ready_status_bottom(ready_status):
+    font = pygame.font.Font(None, 36)
+    text_surface = font.render(ready_status, True, BLACK)
+    text_rect = text_surface.get_rect(center=(WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2))
+    text_rect.bottom = WINDOW_SIZE[1] - 75
+    window.blit(text_surface, text_rect)
+    pygame.display.flip()
 
 def draw_button():
     button_rect = pygame.Rect(300, 270, 200, 60)
