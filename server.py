@@ -82,7 +82,7 @@ def communicate_with_client(client_socket, client_id):
                 attack_name = next(msg_iterator)
                 if next(msg_iterator) == "damage":
                     damage = next(msg_iterator)
-                    print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
+                    print(f"{clients[client_id].battlePokemon.boosted_name if client_id == boost else clients[client_id].battlePokemon.name} used {attack_name}, dealing {damage} damage!")
                     process_attack(client_id, attack_name, damage)
             elif header == "boost":
                 ## if enemy aready used boosting, the action locked 
@@ -179,7 +179,7 @@ def process_attack(client_id, attack_name, damage):
             actual_damage *= 2
         opponent.battlePokemon.get_attacked(actual_damage)
 
-        broadcast_message(f"log:player {client_id} used {attack_name}, dealing {actual_damage} damage!")
+        broadcast_message(f"log:{attacker.battlePokemon.boosted_name if client_id == boost else attacker.battlePokemon.name} used {attack_name}, dealing {actual_damage} damage!")
 
         # calculate new hp vals
         attacker_hp = attacker.battlePokemon.current_hp
