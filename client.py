@@ -445,7 +445,7 @@ def show_gameplay_screen():
         img_data = response.json()["sprites"]["front_default"]
         enemy_boosted_pokemon_image = requests.get(img_data)
 
-    img = pygame.image.load(BytesIO(enemy_boosted_pokemon_image if enemy_boosted else enemy_pokemon_image.content))
+    img = pygame.image.load(BytesIO(enemy_boosted_pokemon_image.content if enemy_boosted else enemy_pokemon_image.content))
     scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
