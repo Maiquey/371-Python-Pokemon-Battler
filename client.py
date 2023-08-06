@@ -16,6 +16,7 @@ current_energy = 0
 my_pokemon_image = None
 enemy_pokemon_image = None
 attack_lock = False #if there is an attack in progress
+boost_lock = False
 game_over = False
 player_hp = 100
 enemy_hp = 100
@@ -36,8 +37,11 @@ def receive_message(sock):
             global attack_lock
             global player_hp
             global enemy_hp
+            global boosted
+            global my_pokemon_image
             global enemy_boosted
             global enemy_pokemon_image
+            global boost_lock
             global attack_render_queue
 
             data = sock.recv(4096)
@@ -76,8 +80,22 @@ def receive_message(sock):
             elif header == "resume_counter":
                 energy_locked = False
             elif header == "boost":
+                boosted = True
+                my_pokemon_image = None
+                show_gameplay_screen()
+            elif header == "enemy_boost":
                 enemy_boosted = True
                 enemy_pokemon_image = None
+                boost_lock = True
+                show_gameplay_screen()
+            elif header == "boost_end":
+                boosted = False
+                my_pokemon_image = None
+                show_gameplay_screen()
+            elif header == "enemy_boost_end":
+                enemy_boosted = False
+                enemy_pokemon_image = None
+                boost_lock = False
                 show_gameplay_screen()
             elif header == "lock":
                 attack_lock = True
@@ -214,6 +232,7 @@ def energy_counter():
     global boosted
     global my_pokemon_image
     global enemy_pokemon_image
+    global boost_lock
     global attack_lock
     global attack_render_queue
     global attack_log_history
@@ -229,6 +248,7 @@ def energy_counter():
             my_pokemon_image = None
             enemy_pokemon_image = None
             boosted = False
+            boost_lock = False
             enemy_boosted = False
             attack_lock = False
             attack_log_history.clear()
@@ -251,8 +271,7 @@ def energy_counter():
         # Cap energy at 200
         if not attack_lock and current_energy  < 200:
             current_energy +=1
-            if boosted:current_energy += 1
-        clock.tick(5)
+        clock.tick(10 if boosted else 5)
 
         # Change Ability Button Colours from Greyed
         if current_energy >= ability_dmg[0]:
@@ -291,7 +310,6 @@ def render_log(log_history):
         text_x = WINDOW_SIZE[0] - 340 + 5  # X-coordinate inside the rect
         text_y = WINDOW_SIZE[1] - 170 + 30 + index * 25  # Y-coordinate inside the rect, 25 pixels down per line
         window.blit(text_surface, (text_x, text_y))
-    pygame.display.flip()
 
 # Function to flash the attack message. 
 def render_attack():
@@ -329,7 +347,7 @@ def show_gameplay_screen():
     global boosted
     # Background
     window.fill(TAN)
-    
+
     # Hud Window + Border
     hud_height = 200
     hud_window = pygame.Rect(0, (WINDOW_SIZE[1] - hud_height), WINDOW_SIZE[0], hud_height)
@@ -339,11 +357,13 @@ def show_gameplay_screen():
     hud_border = pygame.Rect(0, (WINDOW_SIZE[1] - hud_height - hub_border_height), WINDOW_SIZE[0], hub_border_height)
     pygame.draw.rect(window, BLACK, hud_border)
 
+
     # Ability Buttons
     draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0])
     draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1])
+
     # fetch pokemon img
-    if(my_pokemon_image == None):
+    if my_pokemon_image == None:
         url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.boosted_number if boosted else battle_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["back_default"]
@@ -355,10 +375,9 @@ def show_gameplay_screen():
     img = pygame.transform.scale(img, (img_width, img_height))
     my_pokemon_image_rect = pygame.Rect(-20, 170, 60, 60)
     window.blit(img, my_pokemon_image_rect)
-    
-    render_log(attack_log_history)
+    pygame.display.flip()
 
-    if(enemy_pokemon_image == None):
+    if enemy_pokemon_image == None:
         url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.boosted_number if enemy_boosted else enemy_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["front_default"]
@@ -370,16 +389,20 @@ def show_gameplay_screen():
     img = pygame.transform.scale(img, (img_width, img_height))
     enemy_pokemon_image_rect = pygame.Rect(550, -50, 60, 60)
     window.blit(img, enemy_pokemon_image_rect)
+    pygame.display.flip()
 
     #boosted button
-    scale_factor = 0.1
-    img = pygame.image.load("./img/fire.png" if boosted else "./img/fire2.png")
-    img_width = int(img.get_width() * scale_factor)
-    img_height = int(img.get_height() * scale_factor)
-    img = pygame.transform.scale(img, (img_width, img_height))
-    boosted_button = pygame.Rect(720, 310, 60, 60)
-    window.blit(img, boosted_button)
+    if not boost_lock:
+        scale_factor = 0.1
+        img = pygame.image.load("./img/fire.png" if boosted else "./img/fire2.png")
+        img_width = int(img.get_width() * scale_factor)
+        img_height = int(img.get_height() * scale_factor)
+        img = pygame.transform.scale(img, (img_width, img_height))
+        boosted_button = pygame.Rect(720, 310, 60, 60)
+        window.blit(img, boosted_button)
 
+    # render_log(attack_log_history)
+    
     # Health Bars
     # Player's Health
     pygame.draw.line(window, BLACK, (230, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
@@ -423,6 +446,7 @@ def show_gameplay_screen():
         global_threads.append(attack_render_thread)
         global_threads[0].start()
         global_threads[1].start()
+    pygame.display.flip()
 
 
 # Recive the player count from server
@@ -542,13 +566,14 @@ if __name__ == "__main__":
 
                         # boost pokemon
                         if boosted_button.collidepoint(mouse_pos):
-                            if current_energy > 15:
-                                boosted = True
-                                my_pokemon_image = None
+                            if current_energy > 15 and not boost_lock and not boosted:
                                 boost_message ="boost"
-                                print("boosting !!!")
+                                print("try to boost !!!")
                                 client_socket.send(boost_message.encode("utf-8"))
-                                show_gameplay_screen()
+                            elif boosted:
+                                boost_message ="stop_boost"
+                                print("stop boosting !!!")
+                                client_socket.send(boost_message.encode("utf-8"))
                             
                         # Checks if ability is not greyed out, and if they clicked on the button
                         if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False) and (not attack_lock):
