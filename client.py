@@ -15,6 +15,8 @@ ability_lock = {}
 current_energy = 0
 my_pokemon_image = None
 enemy_pokemon_image = None
+boosted_pokemon_image = None
+enemy_boosted_pokemon_image = None
 attack_lock = False #if there is an attack in progress
 boost_lock = False
 game_over = False
@@ -81,20 +83,16 @@ def receive_message(sock):
                 energy_locked = False
             elif header == "boost":
                 boosted = True
-                my_pokemon_image = None
                 show_gameplay_screen()
             elif header == "enemy_boost":
                 enemy_boosted = True
-                enemy_pokemon_image = None
                 boost_lock = True
                 show_gameplay_screen()
             elif header == "boost_end":
                 boosted = False
-                my_pokemon_image = None
                 show_gameplay_screen()
             elif header == "enemy_boost_end":
                 enemy_boosted = False
-                enemy_pokemon_image = None
                 boost_lock = False
                 show_gameplay_screen()
             elif header == "lock":
@@ -278,7 +276,9 @@ def energy_counter():
     global enemy_boosted
     global boosted
     global my_pokemon_image
+    global boosted_pokemon_image
     global enemy_pokemon_image
+    global enemy_boosted_pokemon_image
     global boost_lock
     global attack_lock
     global attack_render_queue
@@ -293,7 +293,9 @@ def energy_counter():
         if game_over:
             energy_locked = False
             my_pokemon_image = None
+            boosted_pokemon_image = None
             enemy_pokemon_image = None
+            enemy_boosted_pokemon_image = None
             boosted = False
             boost_lock = False
             enemy_boosted = False
@@ -389,7 +391,9 @@ def render_attack():
 def show_gameplay_screen():
     global enemy_hp
     global my_pokemon_image
+    global boosted_pokemon_image
     global enemy_pokemon_image
+    global enemy_boosted_pokemon_image
     global enemy_boosted
     global boosted
     # Background
@@ -410,11 +414,17 @@ def show_gameplay_screen():
     draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], True)
     # fetch pokemon img
     if my_pokemon_image == None:
-        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.boosted_number if boosted else battle_pokemon.number); 
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["back_default"]
         my_pokemon_image = requests.get(img_data)
-    img = pygame.image.load(BytesIO(my_pokemon_image.content))
+    if boosted and (boosted_pokemon_image  == None):
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.boosted_number); 
+        response = requests.get(url)
+        img_data = response.json()["sprites"]["back_default"]
+        boosted_pokemon_image = requests.get(img_data)
+
+    img = pygame.image.load(BytesIO(boosted_pokemon_image.content if boosted else my_pokemon_image.content))
     scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
@@ -424,11 +434,18 @@ def show_gameplay_screen():
     pygame.display.flip()
 
     if enemy_pokemon_image == None:
-        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.boosted_number if enemy_boosted else enemy_pokemon.number); 
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["front_default"]
         enemy_pokemon_image= requests.get(img_data)
-    img = pygame.image.load(BytesIO(enemy_pokemon_image.content))
+
+    if enemy_boosted and (enemy_boosted_pokemon_image == None):
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.boosted_number); 
+        response = requests.get(url)
+        img_data = response.json()["sprites"]["front_default"]
+        enemy_boosted_pokemon_image = requests.get(img_data)
+
+    img = pygame.image.load(BytesIO(enemy_boosted_pokemon_image if enemy_boosted else enemy_pokemon_image.content))
     scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
@@ -436,6 +453,8 @@ def show_gameplay_screen():
     enemy_pokemon_image_rect = pygame.Rect(550, -50, 60, 60)
     window.blit(img, enemy_pokemon_image_rect)
     pygame.display.flip()
+
+
 
     #boosted button
     if not boost_lock:

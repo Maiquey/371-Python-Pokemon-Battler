@@ -97,6 +97,7 @@ def communicate_with_client(client_socket, client_id):
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
+            boost = -1
             break
 
     # close connection
