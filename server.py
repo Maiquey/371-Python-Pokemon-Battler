@@ -178,7 +178,7 @@ def process_attack(client_id, attack_name, damage):
             actual_damage *= 2
         opponent.battlePokemon.get_attacked(actual_damage)
 
-        broadcast_message(f"log:player {client_id} used {attack_name}, dealing {damage} damage!")
+        broadcast_message(f"log:player {client_id} used {attack_name}, dealing {actual_damage} damage!")
 
         # calculate new hp vals
         attacker_hp = attacker.battlePokemon.current_hp

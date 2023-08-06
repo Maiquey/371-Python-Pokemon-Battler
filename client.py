@@ -449,7 +449,7 @@ def show_gameplay_screen():
         boosted_button = pygame.Rect(720, 310, 60, 60)
         window.blit(img, boosted_button)
 
-    # render_log(attack_log_history)
+    render_log(attack_log_history)
     
     # Health Bars
     # Player's Health
