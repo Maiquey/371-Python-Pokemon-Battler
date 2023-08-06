@@ -246,7 +246,7 @@ def draw_ability_button(padding, name, cost, colour):
     window.blit(text_surface, text_rect)
 
 # Function to draw greyed out ability buttons for battle view
-def draw_ability_button_lock(padding, name, lock, cost):##########################################################################################################################################################
+def draw_ability_button_lock(padding, name, lock, cost):
     # Update Ability lock to be True, so its  greyed out and unclickable
     if lock:
         global ability_lock
