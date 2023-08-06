@@ -7,6 +7,8 @@ from models.player import Player
 lock = threading.Lock()
 clients_locked = False
 
+boost = -1
+
 # dictionary of connected clients
 # {client_id, Player}
 # Justin's Change: Changed Shotaro's conversion from list back to dictionary
@@ -53,6 +55,7 @@ def server_main():
     
 # client thread
 def communicate_with_client(client_socket, client_id):
+    global boost
     while True:
         try:
             data = client_socket.recv(1024)
@@ -79,13 +82,22 @@ def communicate_with_client(client_socket, client_id):
                 attack_name = next(msg_iterator)
                 if next(msg_iterator) == "damage":
                     damage = next(msg_iterator)
-                    print(f"player {client_id} used {attack_name}, dealing {damage} damage!")
+                    print(f"{clients[client_id].battlePokemon.boosted_name if client_id == boost else clients[client_id].battlePokemon.name} used {attack_name}, dealing {damage} damage!")
                     process_attack(client_id, attack_name, damage)
+            elif header == "boost":
+                ## if enemy aready used boosting, the action locked 
+                if boost == -1:
+                   boost_my_pokemon(clients, client_id)
+            elif header == "stop_boost":
+                if boost != -1:
+                   stop_boost_my_pokemon(clients, client_id)
             elif header == "return":
+                boost = -1
                 clients[client_id].battlePokemon.current_hp = clients[client_id].battlePokemon.hp 
 
         except Exception as e:
             print(f"Error handling client {client_id}: {e}")
+            boost = -1
             break
 
     # close connection
@@ -100,7 +112,7 @@ def broadcast_message(message):
         if message == "game_start":
             # if player1 and player2 use same pokemon, player1 get Mewtwo as a special pokemon
             if clients[keys[0]].battlePokemon == clients[keys[1]].battlePokemon:
-                clients[keys[0]].usePokemon(clients[keys[0]].pokemons[-1])
+                clients[keys[0]].usePokemon(10)
             pokemonMsg = pokemonMsg = f"pokemon:{pickle.dumps(clients[keys[0]].battlePokemon)}:{pickle.dumps(clients[keys[1]].battlePokemon)}"
             clients[keys[0]].sock.send(pokemonMsg.encode("utf-8"))
             pokemonMsg = pokemonMsg = f"pokemon:{pickle.dumps(clients[keys[1]].battlePokemon)}:{pickle.dumps(clients[keys[0]].battlePokemon)}"
@@ -143,6 +155,7 @@ def start_game():
 
 def process_attack(client_id, attack_name, damage):
     global clients_locked
+    global boost
 
     opponent_id = 0
 
@@ -161,9 +174,12 @@ def process_attack(client_id, attack_name, damage):
         clients_locked = True
         broadcast_message("lock")
 
-        opponent.battlePokemon.get_attacked(int(damage))
+        actual_damage = int(damage)
+        if opponent_id == boost:
+            actual_damage *= 2
+        opponent.battlePokemon.get_attacked(actual_damage)
 
-        broadcast_message(f"log:player {client_id} used {attack_name}, dealing {damage} damage!")
+        broadcast_message(f"log:{attacker.battlePokemon.boosted_name if client_id == boost else attacker.battlePokemon.name} used {attack_name}, dealing {actual_damage} damage!")
 
         # calculate new hp vals
         attacker_hp = attacker.battlePokemon.current_hp
@@ -192,6 +208,25 @@ def process_attack(client_id, attack_name, damage):
 
         clients_locked = False
         return
+    
+def boost_my_pokemon(clients, client_id):
+    # Should only ever be 2 clients at a time
+    global boost
+    for key in clients.keys():
+        if key != client_id:
+             clients[key].sock.send("enemy_boost".encode("utf-8"))
+        if key == client_id:
+             boost = client_id
+             clients[key].sock.send("boost".encode("utf-8"))
+
+def stop_boost_my_pokemon(clients, client_id):
+    global boost
+    for key in clients.keys():
+        if key != client_id:
+            clients[key].sock.send("enemy_boost_end".encode("utf-8"))
+        if key == client_id:
+            clients[key].sock.send("boost_end".encode("utf-8"))
+    boost = -1
 
 if __name__ == "__main__":
     server_main()
