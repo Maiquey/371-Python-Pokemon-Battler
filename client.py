@@ -98,8 +98,8 @@ def receive_message(sock):
             elif header == "lock":
                 attack_lock = True
                 attack_render_queue += 1
-                draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False) #false means don't set the action_lock
-                draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False)
+                draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False, battle_pokemon.ability[list(battle_pokemon.ability)[0]]) #false means don't set the action_lock
+                draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
             elif header == "unlock":
                 attack_lock = False
             elif header == "hp_update":
@@ -231,33 +231,33 @@ def draw_return_button():
     window.blit(text_surface, text_rect)
 
 # Function to draw ability buttons for battle view
-def draw_ability_button(padding, name, colour):
+def draw_ability_button(padding, name, cost, colour):
     # Update Ability lock to be False, so its not greyed out and clickable
     global ability_lock
     ability_lock[name] = False
     # Draws ability buttons
-    ability_height, ability_width = 60, 180
+    ability_height, ability_width = 80, 200
     ability1_button = pygame.Rect(50, (WINDOW_SIZE[1] - ability_height - padding), ability_width, ability_height)
     pygame.draw.rect(window, colour, ability1_button, 0 , 3)
     border_button = pygame.Rect(48, (WINDOW_SIZE[1] - ability_height - padding), ability_width+4, ability_height)
     pygame.draw.rect(window, BLACK, border_button, 3 , 3)
-    text_surface = font.render(name, True, WHITE)
+    text_surface = font.render(f"{name} [{cost}]", True, WHITE)
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
 # Function to draw greyed out ability buttons for battle view
-def draw_ability_button_lock(padding, name, lock):
+def draw_ability_button_lock(padding, name, lock, cost):
     # Update Ability lock to be True, so its  greyed out and unclickable
     if lock:
         global ability_lock
         ability_lock[name] = True
     # Draws greyed out ability buttons
-    ability_height, ability_width = 60, 180
+    ability_height, ability_width = 80, 200
     ability1_button = pygame.Rect(50, (WINDOW_SIZE[1] - ability_height - padding), ability_width, ability_height)
     pygame.draw.rect(window, GREY, ability1_button, 0 , 3)
     border_button = pygame.Rect(48, (WINDOW_SIZE[1] - ability_height - padding), ability_width+4, ability_height)
     pygame.draw.rect(window, BLACK, border_button, 3 , 3)
-    text_surface = font.render(name, True, WHITE)
+    text_surface = font.render(f"{name} [{cost}]", True, WHITE)
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
@@ -324,9 +324,9 @@ def energy_counter():
 
         # Change Ability Button Colours from Greyed if energy is available and not locked
         if current_energy >= ability_dmg[0] and not attack_lock:
-            draw_ability_button(20, list(battle_pokemon.ability.keys())[0], MAGENTA)
+            draw_ability_button(20, list(battle_pokemon.ability.keys())[0], battle_pokemon.ability[list(battle_pokemon.ability)[0]], MAGENTA)
         if current_energy >= ability_dmg[1] and not attack_lock:
-            draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
+            draw_ability_button(110, list(battle_pokemon.ability.keys())[1], battle_pokemon.ability[list(battle_pokemon.ability)[1]], TEAL)
         
 def render_game_over_screen(win_state):
     global game_over
@@ -410,8 +410,8 @@ def show_gameplay_screen():
 
 
     # Ability Buttons
-    draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], True)
-    draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], True)
+    draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], True, battle_pokemon.ability[list(battle_pokemon.ability)[0]])
+    draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], True, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
     # fetch pokemon img
     if my_pokemon_image == None:
         url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.number); 
@@ -660,9 +660,9 @@ if __name__ == "__main__":
 
                         # Greys out ability buttons if now the updated energy is less than cost or if there is an attack going on
                         if current_energy < ability1_dmg or attack_lock:
-                            draw_ability_button_lock(20, list(battle_pokemon.ability)[0], True)
+                            draw_ability_button_lock(20, list(battle_pokemon.ability)[0], True, battle_pokemon.ability[list(battle_pokemon.ability)[0]])
                         if current_energy < ability1_dmg or attack_lock:
-                            draw_ability_button_lock(110, list(battle_pokemon.ability)[1], True)
+                            draw_ability_button_lock(110, list(battle_pokemon.ability)[1], True, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
 
 
         # Close the client socket and quit Pygame when the loop ends
