@@ -9,8 +9,8 @@ from models.pokemon import Pokemon
 from io import BytesIO
 
 # Global Varaibles
-battle_pokemon = Pokemon("", {}, 0, 0)
-enemy_pokemon = Pokemon("", {}, 0, 0)
+battle_pokemon = Pokemon("", {}, 0, 0, "")
+enemy_pokemon = Pokemon("", {}, 0, 0, "")
 ability_lock = {}
 current_energy = 0
 my_pokemon_image = None
@@ -471,14 +471,14 @@ def show_gameplay_screen():
     # Health Bars
     # Player's Health
     pygame.draw.line(window, BLACK, (230, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
-    text_surface = underline_font.render("Player 1", True, BLACK)
+    text_surface = underline_font.render(battle_pokemon.boosted_name if boosted else battle_pokemon.name, True, BLACK)
     window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 140)))
     # p_health = 100
     text_surface = font.render("Health: " + str(player_hp), True, BLACK)
     window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
     pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 200), 100), 6)
-    text_surface = underline_font.render("Player 2", True, BLACK)
+    text_surface = underline_font.render(enemy_pokemon.boosted_name if enemy_boosted else enemy_pokemon.name, True, BLACK)
     text_rect = text_surface.get_rect()
     text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 200)
     window.blit(text_surface,text_rect)
