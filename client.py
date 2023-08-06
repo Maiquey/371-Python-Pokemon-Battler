@@ -25,61 +25,66 @@ selected_ball = 0
 attack_log_history = deque()
 attack_render_queue = 0
 
-# incoming messages
+# thread for incoming messages
 def receive_message(sock):
-    message_lock = threading.Lock()
     while True:
         try:
-        # with message_lock:
             global attack_lock
             global player_hp
             global enemy_hp
             global attack_render_queue
 
+            # receive message from the server
             data = sock.recv(4096)
             if not data:
                 break
             
-            # receive and split incoming message
+            # split incoming message into its headers and payloads
             message = data.decode("utf-8").split(":")
 
-            # iterate through headers and payloads
+            # create iterator to iterate through headers and payloads
             msg_iterator = iter(message)
             header = next(msg_iterator)
 
-            # text header for printing text
+            # text header for printing text (testing purposes)
             if header == "text":
                 print(next(msg_iterator))
+            # log header for printing messages to the attack log
             elif header == "log":
                 log_message = next(msg_iterator)
                 attack_log_history.append(log_message)
                 if len(attack_log_history) > 5:
                     attack_log_history.popleft()
-                print(f"Log: {log_message}") #REMOVE
-            # game_start header for starting the game
+            # header for loading pokemon data at the start of a game
             elif header == "pokemon":
                 global battle_pokemon 
                 global enemy_pokemon
                 battle_pokemon = pickle.loads(eval(next(msg_iterator)))
                 enemy_pokemon = pickle.loads(eval(next(msg_iterator)))
+            # game_start header for starting the game + rendering battle UI
             elif header == "game_start":
                 print("loading game")
                 show_gameplay_screen()
+            # lock header signifying shared 'attack' object in use
             elif header == "lock":
                 attack_lock = True
                 attack_render_queue += 1
                 draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False) #false means don't set the action_lock
                 draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False)
+            # unlock header signifying shared 'attack' object no longer in use
             elif header == "unlock":
                 attack_lock = False
+            # hp_update msg sent by server to update hp totals displayed on screen
             elif header == "hp_update":
                 player_hp = int(next(msg_iterator))
                 enemy_hp = int(next(msg_iterator))
                 show_gameplay_screen()
+            # game_over header sent by server when one player defeats the other
             elif header == "game_over":
                 print("game_over received")
                 win_state = next(msg_iterator)
                 render_game_over_screen(win_state) 
+            # ready_display header used to render player statuses in lobby 
             # the client id and even/odd check are used to display two different ready status line
             elif header == "ready_display":
                 player_id = next(msg_iterator)
@@ -89,19 +94,17 @@ def receive_message(sock):
                     display_ready_status_top(ready_status)
                 else:
                     display_ready_status_bottom(ready_status)
-            # for displaying countdown timer until game start
+            # count_down header for displaying countdown timer until game start
             elif header == "count_down":
                 countdown = next(msg_iterator)
                 print(countdown)
                 count_down(countdown)
 
-
-
         except Exception as error:
             print(error)
             break
 
-# Setup pygame window
+# Pygame window setup
 pygame.init()
 WINDOW_SIZE = (800, 600)
 WHITE = (255, 255, 255)
@@ -124,7 +127,7 @@ underline_font.set_underline(True)
 attack_log_font = pygame.font.Font(None, 28)
 attack_log_font.set_underline(True)
 
-
+# UI render for countdown to game start
 def count_down(countdown):
     # Clear the previous text by filling with the background color
     clear = pygame.Rect((0, WINDOW_SIZE[1] - 600), (WINDOW_SIZE[0], 100))
@@ -138,7 +141,7 @@ def count_down(countdown):
     window.blit(text_surface, text_rect)
     pygame.display.flip()
 
-# display the first player's ready status
+# UI render for displaying the first player's ready status
 def display_ready_status_top(ready_status):
     font = pygame.font.Font(None, 36)
     text_surface = font.render(ready_status, True, BLACK)
@@ -147,7 +150,7 @@ def display_ready_status_top(ready_status):
     window.blit(text_surface, text_rect)
     pygame.display.flip()
 
-# display the second player's ready status
+# UI render for displaying the second player's ready status
 def display_ready_status_bottom(ready_status):
     font = pygame.font.Font(None, 36)
     text_surface = font.render(ready_status, True, BLACK)
@@ -156,6 +159,7 @@ def display_ready_status_bottom(ready_status):
     window.blit(text_surface, text_rect)
     pygame.display.flip()
 
+# UI render for lobby ready button
 def draw_button():
     button_rect = pygame.Rect(300, 270, 200, 60)
     pygame.draw.rect(window, GREEN, button_rect)
@@ -163,6 +167,7 @@ def draw_button():
     text_rect = text_surface.get_rect(center=button_rect.center)
     window.blit(text_surface, text_rect)
 
+# UI render for lobby pokeballs
 def draw_balls():
     scale_factor = 0.1
     img = pygame.image.load("./img/ball.png")
@@ -184,7 +189,7 @@ def draw_balls():
 
     return selected_ball
 
-
+# UI render for locked in ready button
 def draw_button_lock():
     button_rect = pygame.Rect(300, 270, 200, 60)
     pygame.draw.rect(window, GREEN_LOCKED, button_rect)
@@ -193,6 +198,7 @@ def draw_button_lock():
     window.blit(text_surface, text_rect)
     pygame.display.flip()
 
+# UI render for return to lobby button
 def draw_return_button():
     button_rect = pygame.Rect(300, 270, 200, 60)
     pygame.draw.rect(window, WHITE, button_rect)
@@ -200,7 +206,7 @@ def draw_return_button():
     text_rect = text_surface.get_rect(center=button_rect.center)
     window.blit(text_surface, text_rect)
 
-# Function to draw ability buttons for battle view
+# UI render for ability buttons in battle view
 def draw_ability_button(padding, name, colour):
     # Update Ability lock to be False, so its not greyed out and clickable
     global ability_lock
@@ -215,7 +221,7 @@ def draw_ability_button(padding, name, colour):
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
-# Function to draw greyed out ability buttons for battle view
+# UI render for greyed-out ability buttons in battle view
 def draw_ability_button_lock(padding, name, lock):
     # Update Ability lock to be True, so its  greyed out and unclickable
     if lock:
@@ -231,7 +237,8 @@ def draw_ability_button_lock(padding, name, lock):
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
-# Function to draw energy counter section in battle view
+# UI render for energy counter in battle view
+# delegated to seperate thread
 def energy_counter():
     # List of ability dmgs/costs
     ability_dmg = list(battle_pokemon.ability.values())
@@ -282,6 +289,7 @@ def energy_counter():
         if current_energy >= ability_dmg[1] and not attack_lock:
             draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
         
+# UI render for game over state
 def render_game_over_screen(win_state):
     global game_over
     window.fill(BLUE)
@@ -297,6 +305,7 @@ def render_game_over_screen(win_state):
     pygame.display.flip()
     game_over = True
 
+# UI render for attack log during battle
 def render_log(log_history):
     #Clear the logs, there is probably a better way to do this
     white_rect = pygame.Rect((WINDOW_SIZE[0] - 340), (WINDOW_SIZE[1] - 170), 300, 150)
@@ -315,7 +324,8 @@ def render_log(log_history):
         window.blit(text_surface, (text_x, text_y))
     pygame.display.flip()
 
-# Function to flash the attack message. 
+# UI render for flashing attack UI element when shared object in use
+# delegated to seperate thread
 def render_attack():
     global game_over
     global attack_render_queue
@@ -343,6 +353,7 @@ def render_attack():
                 flash_count += 1
             attack_render_queue -= 1
 
+# main UI render function for battle view and any updates to the UI
 def show_gameplay_screen():
     global enemy_hp
     global my_pokemon_image
@@ -376,6 +387,7 @@ def show_gameplay_screen():
     my_pokemon_image_rect = pygame.Rect(-20, 170, 60, 60)
     window.blit(img, my_pokemon_image_rect)
     
+    # render the attack log based on attack_log_history deque()
     render_log(attack_log_history)
 
     if(enemy_pokemon_image == None):
@@ -426,6 +438,7 @@ def show_gameplay_screen():
     text_rect = text_surface.get_rect(center=(box_center[0], box_center[1]-30))
     window.blit(text_surface, text_rect)
 
+    # spawn threads if first time rendering
     # Energy Counter + Timer 
     if len(global_threads) == 0:
         counter_thread = threading.Thread(target=energy_counter)
@@ -434,7 +447,6 @@ def show_gameplay_screen():
         global_threads.append(attack_render_thread)
         global_threads[0].start()
         global_threads[1].start()
-
 
 # Recive the player count from server
 def receive_dictionary_length(client_socket):
@@ -449,12 +461,14 @@ def receive_dictionary_length(client_socket):
         print(f"Error receiving dictionary length: {e}")
     return None
 
+# UI render for lobby screen
 def draw_lobby_screen():
     window.fill(WHITE)
     draw_button()
     draw_balls()
     pygame.display.flip()
 
+# main driver
 if __name__ == "__main__":
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect(('localhost', 8080))
@@ -466,7 +480,7 @@ if __name__ == "__main__":
         client_socket.close
     
     else:
-        # Thread for incoming messages
+        # Create thread for incoming messages
         receiver_thread = threading.Thread(target=receive_message, args=(client_socket,))
         receiver_thread.start()
 
@@ -475,8 +489,10 @@ if __name__ == "__main__":
         ready_locked_in = False
         ability_locked_in = False
 
+        # initial UI render
         draw_lobby_screen()
 
+        # main loop, mostly taking care of click events
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -510,6 +526,7 @@ if __name__ == "__main__":
                             draw_button()
                             draw_balls()
                             pygame.display.flip()
+                        # event for when player clicks 'ready' button
                         if button_rect.collidepoint(mouse_pos):
                             # lock the button and send ready message to server
                             ready_locked_in = True
@@ -517,10 +534,10 @@ if __name__ == "__main__":
                             ready_message = f"ready:{ball_state[selected_ball]}"
                             client_socket.send(ready_message.encode("utf-8"))
                         
-
                     elif game_over:
                         button_rect = pygame.Rect(300, 270, 200, 60)
 
+                        # event for when player clicks 'return to lobby' button
                         if button_rect.collidepoint(mouse_pos):
                             # lock the button and send ready message to server
                             return_message = "return"
@@ -548,6 +565,7 @@ if __name__ == "__main__":
                         ability1_rect = pygame.Rect(50, 520, 180, 60) 
                         ability2_rect = pygame.Rect(50, 430, 180, 60)
 
+                        # Click Event Listeners for ability buttons
                         # Checks if ability is not greyed out, and if they clicked on the button
                         if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False) and (not attack_lock):
                             # Update Current Energy Value
