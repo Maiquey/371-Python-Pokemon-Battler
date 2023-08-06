@@ -72,7 +72,7 @@ def communicate_with_client(client_socket, client_id):
 
             # server request logic
             if header == "ready":
-                msg = f"text:Player {client_id} is ready"
+                msg = f"ready_display:{client_id}:Player {client_id} READY" # changed header from text to ready_display, also pass the client id 
                 broadcast_message(msg)
                 pokemon_index = applicationMessage[1]
                 clients[client_id].usePokemon(int(pokemon_index))
@@ -118,8 +118,8 @@ def broadcast_message(message):
             clients[keys[1]].sock.send(pokemonMsg.encode("utf-8"))
         clients[keys[0]].sock.send(message.encode("utf-8"))
         clients[keys[1]].sock.send(message.encode("utf-8"))
-    except:
-        print("Error broadcasting message.")
+    except Exception as e:
+        print("Error broadcasting message: ", {e})
 
 
 # check if all players are ready before starting game
@@ -142,11 +142,13 @@ def send_dictionary_length(client_socket, length):
         print(f"Error sending dictionary length to client: {e}")   
 
 def start_game():
-    broadcast_message("text:All players are ready\nStarting Game\n3")
+    broadcast_message("count_down:3")
     time.sleep(1)
-    broadcast_message("text:2")
+    broadcast_message("count_down:2")
     time.sleep(1)
-    broadcast_message("text:1")
+    broadcast_message("count_down:1")
+    time.sleep(1)
+    broadcast_message("count_down:GAME START")
     time.sleep(1)
     broadcast_message("game_start")
 
