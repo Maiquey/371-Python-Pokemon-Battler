@@ -75,31 +75,31 @@ def receive_message(sock):
             elif header == "game_start":
                 print("loading game")
                 show_gameplay_screen()
-            # energy locking while attack occurring
-            # TODO: disable inputs while energy_locked OR implement energy refund message from server
-            elif header == "pause_counter":
-                energy_locked = True
-            elif header == "resume_counter":
-                energy_locked = False
+            # header signifying boosted state
             elif header == "boost":
                 boosted = True
                 show_gameplay_screen()
+            # header signifying enemy boosted state
             elif header == "enemy_boost":
                 enemy_boosted = True
                 boost_lock = True
                 show_gameplay_screen()
+            # header signifying end of boosted state
             elif header == "boost_end":
                 boosted = False
                 show_gameplay_screen()
+            # header signifying end of enemy boosted state
             elif header == "enemy_boost_end":
                 enemy_boosted = False
                 boost_lock = False
                 show_gameplay_screen()
+            # header signaling use of shared object 'attack'
             elif header == "lock":
                 attack_lock = True
                 attack_render_queue += 1
                 draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False, battle_pokemon.ability[list(battle_pokemon.ability)[0]]) #false means don't set the action_lock
                 draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
+            # header signaling availabilit of shared object 'attack'
             elif header == "unlock":
                 attack_lock = False
             # hp_update msg sent by server to update hp totals displayed on screen
