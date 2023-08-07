@@ -9,19 +9,24 @@ from models.pokemon import Pokemon
 from io import BytesIO
 
 # Global Varaibles
-battle_pokemon = Pokemon("", {}, 0)
-enemy_pokemon = Pokemon("", {}, 0)
+battle_pokemon = Pokemon("", {}, 0, 0, "")
+enemy_pokemon = Pokemon("", {}, 0, 0, "")
 ability_lock = {}
 current_energy = 0
 my_pokemon_image = None
 enemy_pokemon_image = None
+boosted_pokemon_image = None
+enemy_boosted_pokemon_image = None
 attack_lock = False #if there is an attack in progress
+boost_lock = False
 game_over = False
 player_hp = 100
 enemy_hp = 100
 global_threads = []
 ball_state = random_numbers = random.sample(range(10), 3)
 selected_ball = 0
+boosted = False
+enemy_boosted = False
 attack_log_history = deque()
 attack_render_queue = 0
 
@@ -32,6 +37,11 @@ def receive_message(sock):
             global attack_lock
             global player_hp
             global enemy_hp
+            global boosted
+            global my_pokemon_image
+            global enemy_boosted
+            global enemy_pokemon_image
+            global boost_lock
             global attack_render_queue
 
             # receive message from the server
@@ -65,13 +75,31 @@ def receive_message(sock):
             elif header == "game_start":
                 print("loading game")
                 show_gameplay_screen()
-            # lock header signifying shared 'attack' object in use
+            # energy locking while attack occurring
+            # TODO: disable inputs while energy_locked OR implement energy refund message from server
+            elif header == "pause_counter":
+                energy_locked = True
+            elif header == "resume_counter":
+                energy_locked = False
+            elif header == "boost":
+                boosted = True
+                show_gameplay_screen()
+            elif header == "enemy_boost":
+                enemy_boosted = True
+                boost_lock = True
+                show_gameplay_screen()
+            elif header == "boost_end":
+                boosted = False
+                show_gameplay_screen()
+            elif header == "enemy_boost_end":
+                enemy_boosted = False
+                boost_lock = False
+                show_gameplay_screen()
             elif header == "lock":
                 attack_lock = True
                 attack_render_queue += 1
-                draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False) #false means don't set the action_lock
-                draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False)
-            # unlock header signifying shared 'attack' object no longer in use
+                draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], False, battle_pokemon.ability[list(battle_pokemon.ability)[0]]) #false means don't set the action_lock
+                draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], False, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
             elif header == "unlock":
                 attack_lock = False
             # hp_update msg sent by server to update hp totals displayed on screen
@@ -207,33 +235,34 @@ def draw_return_button():
     window.blit(text_surface, text_rect)
 
 # UI render for ability buttons in battle view
-def draw_ability_button(padding, name, colour):
+def draw_ability_button(padding, name, cost, colour):
     # Update Ability lock to be False, so its not greyed out and clickable
     global ability_lock
     ability_lock[name] = False
     # Draws ability buttons
-    ability_height, ability_width = 60, 180
+    ability_height, ability_width = 80, 200
     ability1_button = pygame.Rect(50, (WINDOW_SIZE[1] - ability_height - padding), ability_width, ability_height)
     pygame.draw.rect(window, colour, ability1_button, 0 , 3)
     border_button = pygame.Rect(48, (WINDOW_SIZE[1] - ability_height - padding), ability_width+4, ability_height)
     pygame.draw.rect(window, BLACK, border_button, 3 , 3)
-    text_surface = font.render(name, True, WHITE)
+    text_surface = font.render(f"{name} [{cost}]", True, WHITE)
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
+
 # UI render for greyed-out ability buttons in battle view
-def draw_ability_button_lock(padding, name, lock):
+def draw_ability_button_lock(padding, name, lock, cost):
     # Update Ability lock to be True, so its  greyed out and unclickable
     if lock:
         global ability_lock
         ability_lock[name] = True
     # Draws greyed out ability buttons
-    ability_height, ability_width = 60, 180
+    ability_height, ability_width = 80, 200
     ability1_button = pygame.Rect(50, (WINDOW_SIZE[1] - ability_height - padding), ability_width, ability_height)
     pygame.draw.rect(window, GREY, ability1_button, 0 , 3)
     border_button = pygame.Rect(48, (WINDOW_SIZE[1] - ability_height - padding), ability_width+4, ability_height)
     pygame.draw.rect(window, BLACK, border_button, 3 , 3)
-    text_surface = font.render(name, True, WHITE)
+    text_surface = font.render(f"{name} [{cost}]", True, WHITE)
     text_rect = text_surface.get_rect(center=ability1_button.center)
     window.blit(text_surface, text_rect)
 
@@ -249,6 +278,14 @@ def energy_counter():
 
     global current_energy
     global game_over
+    global energy_locked
+    global enemy_boosted
+    global boosted
+    global my_pokemon_image
+    global boosted_pokemon_image
+    global enemy_pokemon_image
+    global enemy_boosted_pokemon_image
+    global boost_lock
     global attack_lock
     global attack_render_queue
     global attack_log_history
@@ -260,6 +297,14 @@ def energy_counter():
     # Incrementing Energy Counter
     while True:
         if game_over:
+            energy_locked = False
+            my_pokemon_image = None
+            boosted_pokemon_image = None
+            enemy_pokemon_image = None
+            enemy_boosted_pokemon_image = None
+            boosted = False
+            boost_lock = False
+            enemy_boosted = False
             attack_lock = False
             attack_log_history.clear()
             break
@@ -279,15 +324,15 @@ def energy_counter():
         #     render_game_over_screen("win")
         
         # Cap energy at 200
-        if not attack_lock and current_energy < 200:
-            current_energy += 1
-        clock.tick(5)
+        if not attack_lock and current_energy  < 200:
+            current_energy +=1
+        clock.tick(10 if boosted else 5)
 
         # Change Ability Button Colours from Greyed if energy is available and not locked
         if current_energy >= ability_dmg[0] and not attack_lock:
-            draw_ability_button(20, list(battle_pokemon.ability.keys())[0], MAGENTA)
+            draw_ability_button(20, list(battle_pokemon.ability.keys())[0], battle_pokemon.ability[list(battle_pokemon.ability)[0]], MAGENTA)
         if current_energy >= ability_dmg[1] and not attack_lock:
-            draw_ability_button(110, list(battle_pokemon.ability.keys())[1], TEAL)
+            draw_ability_button(110, list(battle_pokemon.ability.keys())[1], battle_pokemon.ability[list(battle_pokemon.ability)[1]], TEAL)
         
 # UI render for game over state
 def render_game_over_screen(win_state):
@@ -322,7 +367,6 @@ def render_log(log_history):
         text_x = WINDOW_SIZE[0] - 340 + 5  # X-coordinate inside the rect
         text_y = WINDOW_SIZE[1] - 170 + 30 + index * 25  # Y-coordinate inside the rect, 25 pixels down per line
         window.blit(text_surface, (text_x, text_y))
-    pygame.display.flip()
 
 # UI render for flashing attack UI element when shared object in use
 # delegated to seperate thread
@@ -357,10 +401,14 @@ def render_attack():
 def show_gameplay_screen():
     global enemy_hp
     global my_pokemon_image
+    global boosted_pokemon_image
     global enemy_pokemon_image
+    global enemy_boosted_pokemon_image
+    global enemy_boosted
+    global boosted
     # Background
     window.fill(TAN)
-    
+
     # Hud Window + Border
     hud_height = 200
     hud_window = pygame.Rect(0, (WINDOW_SIZE[1] - hud_height), WINDOW_SIZE[0], hud_height)
@@ -370,57 +418,87 @@ def show_gameplay_screen():
     hud_border = pygame.Rect(0, (WINDOW_SIZE[1] - hud_height - hub_border_height), WINDOW_SIZE[0], hub_border_height)
     pygame.draw.rect(window, BLACK, hud_border)
 
+
     # Ability Buttons
-    draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], True)
-    draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], True)
+    draw_ability_button_lock(20, list(battle_pokemon.ability.keys())[0], True, battle_pokemon.ability[list(battle_pokemon.ability)[0]])
+    draw_ability_button_lock(110, list(battle_pokemon.ability.keys())[1], True, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
     # fetch pokemon img
-    if(my_pokemon_image == None):
+    if my_pokemon_image == None:
         url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["back_default"]
         my_pokemon_image = requests.get(img_data)
-    img = pygame.image.load(BytesIO(my_pokemon_image.content))
-    scale_factor = 3.0
+    if boosted and (boosted_pokemon_image  == None):
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(battle_pokemon.boosted_number); 
+        response = requests.get(url)
+        img_data = response.json()["sprites"]["back_default"]
+        boosted_pokemon_image = requests.get(img_data)
+
+    img = pygame.image.load(BytesIO(boosted_pokemon_image.content if boosted else my_pokemon_image.content))
+    scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
     img = pygame.transform.scale(img, (img_width, img_height))
     my_pokemon_image_rect = pygame.Rect(-20, 170, 60, 60)
     window.blit(img, my_pokemon_image_rect)
     
-    # render the attack log based on attack_log_history deque()
-    render_log(attack_log_history)
+    # # render the attack log based on attack_log_history deque()
+    # render_log(attack_log_history)
+    pygame.display.flip()
 
-    if(enemy_pokemon_image == None):
+    if enemy_pokemon_image == None:
         url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.number); 
         response = requests.get(url)
         img_data = response.json()["sprites"]["front_default"]
         enemy_pokemon_image= requests.get(img_data)
-    img = pygame.image.load(BytesIO(enemy_pokemon_image.content))
-    scale_factor = 3.0
+
+    if enemy_boosted and (enemy_boosted_pokemon_image == None):
+        url = "https://pokeapi.co/api/v2/pokemon/" + str(enemy_pokemon.boosted_number); 
+        response = requests.get(url)
+        img_data = response.json()["sprites"]["front_default"]
+        enemy_boosted_pokemon_image = requests.get(img_data)
+
+    img = pygame.image.load(BytesIO(enemy_boosted_pokemon_image.content if enemy_boosted else enemy_pokemon_image.content))
+    scale_factor = 2.7
     img_width = int(img.get_width() * scale_factor)
     img_height = int(img.get_height() * scale_factor)
     img = pygame.transform.scale(img, (img_width, img_height))
     enemy_pokemon_image_rect = pygame.Rect(550, -50, 60, 60)
     window.blit(img, enemy_pokemon_image_rect)
+    pygame.display.flip()
 
+
+
+    #boosted button
+    if not boost_lock:
+        scale_factor = 0.1
+        img = pygame.image.load("./img/fire.png" if boosted else "./img/fire2.png")
+        img_width = int(img.get_width() * scale_factor)
+        img_height = int(img.get_height() * scale_factor)
+        img = pygame.transform.scale(img, (img_width, img_height))
+        boosted_button = pygame.Rect(720, 310, 60, 60)
+        window.blit(img, boosted_button)
+
+    render_log(attack_log_history)
+    
     # Health Bars
     # Player's Health
-    pygame.draw.line(window, BLACK, (200, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
-    text_surface = underline_font.render("Player 1", True, BLACK)
-    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 140)))
+    pygame.draw.line(window, BLACK, (230, (WINDOW_SIZE[1] - hud_height - 80)), ((WINDOW_SIZE[0] - 300), (WINDOW_SIZE[1] - hud_height - 80)), 6)
+    text_surface = underline_font.render(battle_pokemon.boosted_name if boosted else battle_pokemon.name, True, BLACK)
+    window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 140)))
     # p_health = 100
     text_surface = font.render("Health: " + str(player_hp), True, BLACK)
-    window.blit(text_surface, (200, (WINDOW_SIZE[1] - hud_height - 110)))
+    window.blit(text_surface, (230, (WINDOW_SIZE[1] - hud_height - 110)))
     # Enemy's Health
-    pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 170), 100), 6)
-    text_surface = underline_font.render("Player 2", True, BLACK)
+    pygame.draw.line(window, BLACK, (300, 100), ((WINDOW_SIZE[0] - 200), 100), 6)
+    text_surface = underline_font.render(enemy_pokemon.boosted_name if enemy_boosted else enemy_pokemon.name, True, BLACK)
     text_rect = text_surface.get_rect()
-    text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 170)
+    text_rect.top, text_rect.right = 40, (WINDOW_SIZE[0] - 200)
     window.blit(text_surface,text_rect)
     # p_health = 100
     text_surface = font.render("Health: " + str(enemy_hp), True, BLACK)
     text_rect = text_surface.get_rect()
-    text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 170)
+    text_rect.top, text_rect.right = 70, (WINDOW_SIZE[0] - 200)
     window.blit(text_surface, text_rect)
 
     # Attack History Window
@@ -447,6 +525,7 @@ def show_gameplay_screen():
         global_threads.append(attack_render_thread)
         global_threads[0].start()
         global_threads[1].start()
+    pygame.display.flip()
 
 # Recive the player count from server
 def receive_dictionary_length(client_socket):
@@ -553,6 +632,9 @@ if __name__ == "__main__":
                             draw_lobby_screen()
                     # For Clicking Abiltiies in Battle
                     else:
+                        # Boost Pokemon
+                        boosted_button = pygame.Rect(720, 310, 60, 60)
+
                         # Grab ability dmgs and names
                         while battle_pokemon.ability == {}:
                             continue
@@ -565,6 +647,17 @@ if __name__ == "__main__":
                         ability1_rect = pygame.Rect(50, 520, 180, 60) 
                         ability2_rect = pygame.Rect(50, 430, 180, 60)
 
+                        # boost pokemon
+                        if boosted_button.collidepoint(mouse_pos):
+                            if current_energy > 15 and not boost_lock and not boosted:
+                                boost_message ="boost"
+                                print("try to boost !!!")
+                                client_socket.send(boost_message.encode("utf-8"))
+                            elif boosted:
+                                boost_message ="stop_boost"
+                                print("stop boosting !!!")
+                                client_socket.send(boost_message.encode("utf-8"))
+                            
                         # Click Event Listeners for ability buttons
                         # Checks if ability is not greyed out, and if they clicked on the button
                         if (ability1_rect.collidepoint(mouse_pos)) and (ability_lock[list(battle_pokemon.ability)[0]] == False) and (not attack_lock):
@@ -586,9 +679,9 @@ if __name__ == "__main__":
 
                         # Greys out ability buttons if now the updated energy is less than cost or if there is an attack going on
                         if current_energy < ability1_dmg or attack_lock:
-                            draw_ability_button_lock(20, list(battle_pokemon.ability)[0], True)
+                            draw_ability_button_lock(20, list(battle_pokemon.ability)[0], True, battle_pokemon.ability[list(battle_pokemon.ability)[0]])
                         if current_energy < ability1_dmg or attack_lock:
-                            draw_ability_button_lock(110, list(battle_pokemon.ability)[1], True)
+                            draw_ability_button_lock(110, list(battle_pokemon.ability)[1], True, battle_pokemon.ability[list(battle_pokemon.ability)[1]])
 
 
         # Close the client socket and quit Pygame when the loop ends
