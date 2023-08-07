@@ -11,11 +11,7 @@ boost = -1
 
 # dictionary of connected clients
 # {client_id, Player}
-# Justin's Change: Changed Shotaro's conversion from list back to dictionary
 clients = {}
-
-# hard coded list of all implemented actions
-actions = {}
 
 # main server thread
 def server_main():
@@ -25,13 +21,10 @@ def server_main():
 
     print("server listening on port 8080")
 
-    # TODO
-    # Still need to make sure there are 2 players are connected before starting - done
-    # If theres only 1 player and they click "ready", game still starts - done
-
-    # allow 2 clients to connect
+    # allow clients to connect
     while True:
         try:
+            # accept socket connection from client
             client_socket, client_address = server_socket.accept()
             # Send the player count the the client for checking
             send_dictionary_length(client_socket, len(clients)) 
@@ -40,11 +33,12 @@ def server_main():
                 print(f"Accepted connection from {client_address}")
 
                 # create player entry in clients
-                # Justin's Change: Changed Shotaro's conversion from list back to dictionary 
+                # also store the player's socket connection inside this player object
                 p = Player(client_socket)
+                # store the client player object (and their socket connection) in the clients dictionary
                 clients[p.clientId] = p
 
-                # serve client on seperate thread
+                # delegate further messaging between server and this client to a seperate thread
                 client_thread = threading.Thread(target=communicate_with_client, args=(client_socket, p.clientId))
                 client_thread.start()
         except Exception as e:
@@ -58,19 +52,21 @@ def communicate_with_client(client_socket, client_id):
     global boost
     while True:
         try:
+            # receive msg from client
             data = client_socket.recv(1024)
             if not data:
                 break
             message = data.decode("utf-8")
                 
-            #split headers and payloads with :
+            # split headers and payloads with :
             applicationMessage = message.split(":")
 
-            # check headers and payloads
+            # iterate over headers and payloads using an iterator
             msg_iterator = iter(applicationMessage)
             header = next(msg_iterator)
 
             # server request logic
+            # ready header signifying player is ready to start game
             if header == "ready":
                 msg = f"ready_display:{client_id}:Player {client_id} READY" # changed header from text to ready_display, also pass the client id 
                 broadcast_message(msg)
@@ -78,6 +74,7 @@ def communicate_with_client(client_socket, client_id):
                 clients[client_id].usePokemon(int(pokemon_index))
                 clients[client_id].ready = True
                 ready_check()
+            # attack header that requests use of the 'attack' shared object
             elif header == "attack":
                 attack_name = next(msg_iterator)
                 if next(msg_iterator) == "damage":
@@ -122,12 +119,10 @@ def broadcast_message(message):
     except Exception as e:
         print("Error broadcasting message: ", {e})
 
-
 # check if all players are ready before starting game
 def ready_check():
     # check if all players are ready
     for player in clients.values():
-        # Justin: Since we dont need to use getters/setters, replaced function called with class variable call
         if not player.ready:
             return
     # check if there are only 2 players 
@@ -142,6 +137,7 @@ def send_dictionary_length(client_socket, length):
     except Exception as e:
         print(f"Error sending dictionary length to client: {e}")   
 
+# broadcast a countdown and game_start to all players
 def start_game():
     broadcast_message("count_down:3")
     time.sleep(1)
@@ -153,6 +149,12 @@ def start_game():
     time.sleep(1)
     broadcast_message("game_start")
 
+# SHARED OBJECT
+# only one player may perform an attack at any time
+# neither player can use abilities while an attack is occuring
+# both players compete for use of this object in order to deal damage to their opponent
+# we lock this process because it modifies the players' pokemon hp values, which is a critical section
+# use a threading.lock() to ensure only one player can access the object at a time
 def process_attack(client_id, attack_name, damage):
     global clients_locked
     global boost
@@ -164,21 +166,26 @@ def process_attack(client_id, attack_name, damage):
         if key != client_id:
             opponent_id = key
 
+    # keep track of who is attacking and who is the opponent
     attacker = clients[client_id]
     opponent = clients[opponent_id]
 
+    # threading.lock() to ensure only one client is able to access the object at any time
     with lock:
         if clients_locked:
-            attacker.sock.send("text:Waiting for other player to finish their turn".encode("utf-8"))
             return
         clients_locked = True
+
+        # broadcast a lock message to all players to signify that shared object is in use
         broadcast_message("lock")
 
+        # make damage calculations and update hp values
         actual_damage = int(damage)
         if opponent_id == boost:
             actual_damage *= 2
         opponent.battlePokemon.get_attacked(actual_damage)
 
+        # broadcast the successful attack as a log message to all clients
         broadcast_message(f"log:{attacker.battlePokemon.boosted_name if client_id == boost else attacker.battlePokemon.name} used {attack_name}, dealing {actual_damage} damage!")
 
         # calculate new hp vals
@@ -187,7 +194,7 @@ def process_attack(client_id, attack_name, damage):
 
         time.sleep(1)
         try:
-            # Send hp updates to clients
+            # Send hp updates to clients to update each player's UI
             attacker.sock.send(f"hp_update:{attacker_hp}:{opponent_hp}".encode("utf-8"))
             opponent.sock.send(f"hp_update:{opponent_hp}:{attacker_hp}".encode("utf-8"))
         except Exception as error:
@@ -201,9 +208,10 @@ def process_attack(client_id, attack_name, damage):
             attacker.ready = False
             opponent.ready = False
             # Send gameover messages
-            attacker.sock.send("game_over:win".encode("utf-8"))
-            opponent.sock.send("game_over:lose".encode("utf-8"))
+            attacker.sock.send("game_over:win".encode("utf-8")) # attacker wins
+            opponent.sock.send("game_over:lose".encode("utf-8")) # opponent loses
         else:
+            # broadcast unlock message to signify the shared object is no longer in use
             broadcast_message("unlock")
 
         clients_locked = False
